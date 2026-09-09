@@ -35,7 +35,9 @@ import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.plugins.josmmcp.utils.JosmUtils;
 
 import io.modelcontextprotocol.spec.McpSchema;
+import io.modelcontextprotocol.spec.McpSchema.Content;
 import io.modelcontextprotocol.spec.McpSchema.JsonSchema;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
 
 public class SearchTool extends BaseTool {
 
@@ -68,6 +70,24 @@ public class SearchTool extends BaseTool {
 		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, Arrays.asList("query"),
 				null, null, null);
 		return searchSchema;
+	}
+
+	/**
+	 * Searching a large dataset can take a while; do it on the request thread under the
+	 * dataset's read lock instead of blocking the UI on the EDT.
+	 */
+	@Override
+	protected List<Content> execute(Map<String, Object> args) throws Exception {
+		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
+		if (ds == null) {
+			throw new Exception("no active dataset found");
+		}
+		ds.getReadLock().lock();
+		try {
+			return Arrays.asList(new TextContent(handle(args)));
+		} finally {
+			ds.getReadLock().unlock();
+		}
 	}
 
 	@Override
@@ -146,5 +166,10 @@ public class SearchTool extends BaseTool {
 		result.put("truncated", offset + elements.size() < results.size());
 		result.put("elements", elements);
 		return JosmUtils.toJson(result);
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
 	}
 }

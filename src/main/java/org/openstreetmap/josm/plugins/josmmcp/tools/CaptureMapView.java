@@ -111,6 +111,8 @@ public class CaptureMapView extends BaseTool {
 		wait.put("description", "Milliseconds to wait before capturing so imagery tiles can load "
 				+ "(default 0, or " + DEFAULT_WAIT_AFTER_ZOOM_MS + " when zooming; max " + MAX_WAIT_MS + ")");
 		props.put("wait_ms", wait);
+		props.put("restore_view", Map.of("type", "boolean",
+				"description", "After capturing, return the map view to where the user had it (default false; only relevant when zooming)"));
 
 		return new McpSchema.JsonSchema("object", props, null, null, null, null);
 	}
@@ -132,6 +134,10 @@ public class CaptureMapView extends BaseTool {
 			throw new Exception("format must be jpeg or png");
 		}
 
+		boolean restore = args != null && Boolean.TRUE.equals(args.get("restore_view"));
+		org.openstreetmap.josm.data.ViewportData previous = restore
+				? runInEDT(() -> new org.openstreetmap.josm.data.ViewportData(requireMapView().getCenter(), requireMapView().getScale()))
+				: null;
 		boolean zoomed = runInEDT(() -> zoomIfRequested(args));
 
 		int wait = getInt(args, "wait_ms", zoomed ? DEFAULT_WAIT_AFTER_ZOOM_MS : 0);
@@ -144,6 +150,12 @@ public class CaptureMapView extends BaseTool {
 		}
 
 		Capture capture = runInEDT(this::render);
+		if (zoomed && previous != null) {
+			runInEDT(() -> {
+				requireMapView().zoomTo(previous);
+				return null;
+			});
+		}
 
 		BufferedImage scaled = ImageUtils.limitWidth(capture.image, maxWidth);
 		byte[] bytes = ImageUtils.encode(scaled, format, JPEG_QUALITY);
@@ -164,6 +176,7 @@ public class CaptureMapView extends BaseTool {
 		meta.put("meters_per_pixel", capture.metersPerPixel * capture.image.getWidth() / scaled.getWidth());
 		meta.put("visible_layers", capture.visibleLayers);
 		meta.put("zoomed", zoomed);
+		meta.put("view_restored", zoomed && previous != null);
 
 		List<Content> result = new ArrayList<>();
 		result.add(new ImageContent(null, base64, ImageUtils.mimeType(format)));
@@ -267,5 +280,10 @@ public class CaptureMapView extends BaseTool {
 			this.metersPerPixel = metersPerPixel;
 			this.visibleLayers = visibleLayers;
 		}
+	}
+
+	@Override
+	public Category category() {
+		return Category.VIEW;
 	}
 }
