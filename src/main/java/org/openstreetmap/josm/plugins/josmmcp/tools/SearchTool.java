@@ -65,6 +65,12 @@ public class SearchTool extends BaseTool {
 		searchProps.put("offset", Map.of("type", "integer", "description", "Skip this many matches first, for paging (default 0)"));
 		searchProps.put("bbox", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 4, "maxItems", 4,
 				"description", "Only elements intersecting [min_lon, min_lat, max_lon, max_lat]"));
+		searchProps.put("polygon", Map.of("type", "array", "minItems", 3,
+				"items", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 2, "maxItems", 2),
+				"description", "Only elements inside this polygon, as [lon, lat] pairs (a node by position, a way by any node or its centroid)"));
+		searchProps.put("center", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 2, "maxItems", 2,
+				"description", "With radius_m: only elements within that distance of [lon, lat]"));
+		searchProps.put("radius_m", Map.of("type", "number", "description", "Search radius in metres around 'center'"));
 		searchProps.put("fields", Map.of("type", "array", "items", Map.of("type", "string"),
 				"description", "Only include these fields per element, e.g. [\"id\",\"type\",\"tags\"]; omit node_ids/members to keep results small"));
 		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, Arrays.asList("query"),
@@ -139,11 +145,61 @@ public class SearchTool extends BaseTool {
 		} else {
 			candidates = ds.allPrimitives();
 		}
+		List<org.openstreetmap.josm.data.coor.LatLon> ring = null;
+		Object polyObj = args.get("polygon");
+		if (polyObj != null) {
+			ring = JosmUtils.parseRing(polyObj);
+			if (bboxObj == null) {
+				// restrict candidates to the polygon's bounding box first
+				double minLat = 90, minLon = 180, maxLat = -90, maxLon = -180;
+				for (org.openstreetmap.josm.data.coor.LatLon ll : ring) {
+					minLat = Math.min(minLat, ll.lat()); maxLat = Math.max(maxLat, ll.lat());
+					minLon = Math.min(minLon, ll.lon()); maxLon = Math.max(maxLon, ll.lon());
+				}
+				BBox pb = new BBox(minLon, minLat, maxLon, maxLat);
+				List<OsmPrimitive> c = new ArrayList<>();
+				c.addAll(ds.searchNodes(pb));
+				c.addAll(ds.searchWays(pb));
+				c.addAll(ds.searchRelations(pb));
+				candidates = c;
+			}
+		}
+		org.openstreetmap.josm.data.coor.LatLon centre = null;
+		double radius = 0;
+		Object centreObj = args.get("center");
+		if (centreObj != null || args.get("radius_m") != null) {
+			if (!(centreObj instanceof List) || ((List<?>) centreObj).size() != 2 || args.get("radius_m") == null) {
+				throw new Exception("center [lon, lat] and radius_m must be given together");
+			}
+			List<?> cl = (List<?>) centreObj;
+			centre = new org.openstreetmap.josm.data.coor.LatLon(toDouble(cl.get(1), "center"), toDouble(cl.get(0), "center"));
+			radius = toDouble(args.get("radius_m"), "radius_m");
+			if (!centre.isValid() || radius <= 0) {
+				throw new Exception("center must be valid and radius_m positive");
+			}
+			if (bboxObj == null && ring == null) {
+				double dLat = radius / 111320.0;
+				double dLon = radius / (111320.0 * Math.cos(Math.toRadians(centre.lat())));
+				BBox rb = new BBox(centre.lon() - dLon, centre.lat() - dLat, centre.lon() + dLon, centre.lat() + dLat);
+				List<OsmPrimitive> c = new ArrayList<>();
+				c.addAll(ds.searchNodes(rb));
+				c.addAll(ds.searchWays(rb));
+				c.addAll(ds.searchRelations(rb));
+				candidates = c;
+			}
+		}
 		List<OsmPrimitive> results = new ArrayList<>();
 		for (OsmPrimitive prim : candidates) {
-			if (!prim.isDeleted() && !prim.isIncomplete() && matcher.match(prim)) {
-				results.add(prim);
+			if (prim.isDeleted() || prim.isIncomplete() || !matcher.match(prim)) {
+				continue;
 			}
+			if (ring != null && !JosmUtils.insidePolygon(prim, ring)) {
+				continue;
+			}
+			if (centre != null && JosmUtils.distanceMetres(prim, centre) > radius) {
+				continue;
+			}
+			results.add(prim);
 		}
 
 		List<Map<String, Object>> elements = new ArrayList<>();
@@ -159,6 +215,13 @@ public class SearchTool extends BaseTool {
 		result.put("query", query);
 		if (bboxObj != null) {
 			result.put("bbox", bboxObj);
+		}
+		if (ring != null) {
+			result.put("polygon_vertices", ring.size());
+		}
+		if (centre != null) {
+			result.put("center", centreObj);
+			result.put("radius_m", radius);
 		}
 		result.put("total_matches", results.size());
 		result.put("offset", offset);

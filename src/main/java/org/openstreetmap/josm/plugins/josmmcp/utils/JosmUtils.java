@@ -109,4 +109,101 @@ public final class JosmUtils {
 		m.put("user", el.getUser() == null ? null : el.getUser().getName());
 		return m;
 	}
+
+	/** Ray-casting point-in-polygon test on lat/lon; the ring may or may not be closed. */
+	public static boolean pointInPolygon(double lat, double lon, List<LatLon> ring) {
+		boolean inside = false;
+		int n = ring.size();
+		for (int i = 0, j = n - 1; i < n; j = i++) {
+			LatLon a = ring.get(i);
+			LatLon b = ring.get(j);
+			if ((a.lat() > lat) != (b.lat() > lat)
+					&& lon < (b.lon() - a.lon()) * (lat - a.lat()) / (b.lat() - a.lat()) + a.lon()) {
+				inside = !inside;
+			}
+		}
+		return inside;
+	}
+
+	/**
+	 * Whether a primitive lies inside the polygon: a node by its position, a way when its
+	 * centroid or any node is inside, a relation when any member node or way qualifies.
+	 */
+	public static boolean insidePolygon(OsmPrimitive p, List<LatLon> ring) {
+		if (p instanceof Node) {
+			LatLon c = ((Node) p).getCoor();
+			return c != null && pointInPolygon(c.lat(), c.lon(), ring);
+		}
+		if (p instanceof Way) {
+			double lat = 0;
+			double lon = 0;
+			int n = 0;
+			for (Node nd : ((Way) p).getNodes()) {
+				LatLon c = nd.getCoor();
+				if (c == null) {
+					continue;
+				}
+				if (pointInPolygon(c.lat(), c.lon(), ring)) {
+					return true;
+				}
+				lat += c.lat();
+				lon += c.lon();
+				n++;
+			}
+			return n > 0 && pointInPolygon(lat / n, lon / n, ring);
+		}
+		if (p instanceof Relation) {
+			for (RelationMember m : ((Relation) p).getMembers()) {
+				if (!(m.getMember() instanceof Relation) && !m.getMember().isIncomplete() && insidePolygon(m.getMember(), ring)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Great-circle distance in metres from a point to the nearest node of the primitive (or its own position). */
+	public static double distanceMetres(OsmPrimitive p, LatLon centre) {
+		double best = Double.MAX_VALUE;
+		if (p instanceof Node) {
+			LatLon c = ((Node) p).getCoor();
+			return c == null ? best : c.greatCircleDistance(centre);
+		}
+		if (p instanceof Way) {
+			for (Node nd : ((Way) p).getNodes()) {
+				if (nd.getCoor() != null) {
+					best = Math.min(best, nd.getCoor().greatCircleDistance(centre));
+				}
+			}
+			return best;
+		}
+		if (p instanceof Relation) {
+			for (RelationMember m : ((Relation) p).getMembers()) {
+				if (!(m.getMember() instanceof Relation) && !m.getMember().isIncomplete()) {
+					best = Math.min(best, distanceMetres(m.getMember(), centre));
+				}
+			}
+		}
+		return best;
+	}
+
+	/** Parses [[lon, lat], ...] into a ring of at least 3 points. */
+	public static List<LatLon> parseRing(Object coords) throws Exception {
+		if (!(coords instanceof List) || ((List<?>) coords).size() < 3) {
+			throw new Exception("coordinates must be an array of at least 3 [lon, lat] pairs");
+		}
+		List<LatLon> ring = new ArrayList<>();
+		for (Object o : (List<?>) coords) {
+			if (!(o instanceof List) || ((List<?>) o).size() != 2) {
+				throw new Exception("each coordinate must be [lon, lat]");
+			}
+			List<?> c = (List<?>) o;
+			LatLon ll = new LatLon(((Number) c.get(1)).doubleValue(), ((Number) c.get(0)).doubleValue());
+			if (!ll.isValid()) {
+				throw new Exception("invalid coordinate " + ll);
+			}
+			ring.add(ll);
+		}
+		return ring;
+	}
 }
