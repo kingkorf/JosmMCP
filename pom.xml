@@ -4,7 +4,7 @@
 
   <groupId>org.openstreetmap.josm.plugins</groupId>
   <artifactId>josmmcp</artifactId>
-  <version>0.0.5-SNAPSHOT</version>
+  <version>0.0.6-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>josmmcp</name>
@@ -152,6 +152,7 @@
                     <Plugin-Class>org.openstreetmap.josm.plugins.josmmcp.JosmMCPPlugin</Plugin-Class>
                     <Plugin-Description>Exposes JOSM to Model Context Protocol (MCP) clients such as LLM assistants.</Plugin-Description>
                     <Plugin-Link>${project.url}</Plugin-Link>
+                    <Plugin-Icon>images/josmmcp.png</Plugin-Icon>
                     <Author>fansanelli</Author>
                     <Plugin-Canloadatruntime>true</Plugin-Canloadatruntime>
                   </manifestEntries>
@@ -164,6 +165,9 @@
     </plugins>
 
     <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
       <resource>
         <directory>${project.basedir}</directory>
         <includes>
