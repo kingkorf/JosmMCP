@@ -114,21 +114,26 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 	}
 
 	/**
-	 * Applies the output size limit to text content and, when the (single) text result is a
-	 * JSON object, also returns it as structured content.
+	 * Applies the output size limit to text content. Tools that declare an output schema must
+	 * always return structured content, so for those the parsed JSON object is attached; when the
+	 * text had to be truncated (or is not a JSON object), a small object describing that is used
+	 * instead, because the MCP SDK rejects results with a schema but without structured content.
 	 */
-	private static CallToolResult buildResult(List<Content> content) {
+	private CallToolResult buildResult(List<Content> content) {
 		int limit = Prefs.maxOutputChars();
 		List<Content> out = new ArrayList<>(content.size());
 		Object structured = null;
+		boolean truncated = false;
+		int omitted = 0;
 		for (Content c : content) {
 			if (c instanceof TextContent) {
 				String text = ((TextContent) c).text();
 				if (text != null && text.length() > limit) {
-					int omitted = text.length() - limit;
+					omitted = text.length() - limit;
+					truncated = true;
 					text = text.substring(0, limit) + "\n... [output truncated, " + omitted
 							+ " characters omitted; narrow the request with max_results, fields, offset or a bbox]";
-				} else if (structured == null && content.size() == 1 && text != null && text.startsWith("{")) {
+				} else if (structured == null && text != null && text.startsWith("{")) {
 					try {
 						structured = JSON.readValue(text, new TypeReference<Map<String, Object>>() {
 						});
@@ -140,6 +145,16 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 			} else {
 				out.add(c);
 			}
+		}
+		if (returnsJson() && structured == null) {
+			Map<String, Object> fallback = new java.util.LinkedHashMap<>();
+			fallback.put("truncated", truncated);
+			if (truncated) {
+				fallback.put("omitted_chars", omitted);
+				fallback.put("hint", "narrow the request with max_results, fields, offset or a bbox");
+			}
+			fallback.put("text", firstText(out));
+			structured = fallback;
 		}
 		CallToolResult.Builder b = CallToolResult.builder().content(out).isError(false);
 		if (structured != null) {

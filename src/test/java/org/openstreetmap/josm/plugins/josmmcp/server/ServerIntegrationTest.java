@@ -74,6 +74,19 @@ class ServerIntegrationTest {
 	void resetPrefs() {
 		Config.getPref().put(Prefs.TOKEN, "");
 		Config.getPref().putBoolean(Prefs.READ_ONLY, false);
+		Config.getPref().putInt(Prefs.MAX_OUTPUT_CHARS, Prefs.DEFAULT_MAX_OUTPUT_CHARS);
+	}
+
+	@Test
+	void truncatedJsonResultStillHasStructuredContent() throws Exception {
+		Config.getPref().putInt(Prefs.MAX_OUTPUT_CHARS, 40);
+		Response r = post(rpc("tools/call", "{\"name\":\"get_josm_state\",\"arguments\":{}}"), Map.of());
+		assertEquals(200, r.status, r.body);
+		JsonNode result = JSON.readTree(r.body).path("result");
+		assertFalse(result.path("isError").asBoolean(), r.body);
+		assertTrue(result.has("structuredContent"), r.body);
+		assertTrue(result.path("structuredContent").path("truncated").asBoolean(), r.body);
+		assertTrue(result.path("content").get(0).path("text").asText().contains("output truncated"));
 	}
 
 	private static final class Response {
