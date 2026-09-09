@@ -27,6 +27,8 @@ import org.openstreetmap.josm.plugins.josmmcp.tools.CreateRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadArea;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadIncomplete;
+import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadOverpass;
+import org.openstreetmap.josm.plugins.josmmcp.tools.SessionTools;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ImageryTools;
 import org.openstreetmap.josm.plugins.josmmcp.tools.PendingChangesSummary;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadElements;
@@ -75,6 +77,7 @@ public final class ToolRegistry {
 		// Layers and downloads
 		t.add(new DownloadArea());
 		t.add(new DownloadIncomplete());
+		t.add(new DownloadOverpass());
 		t.add(new ImageryTools(ImageryTools.Mode.LIST));
 		t.add(new ImageryTools(ImageryTools.Mode.ADD));
 		t.add(new ImageryTools(ImageryTools.Mode.REMOVE));
@@ -104,6 +107,9 @@ public final class ToolRegistry {
 		t.add(new RevertToServer());
 		t.add(new SaveLayer());
 		t.add(new OpenFile());
+		t.add(new SessionTools(SessionTools.Mode.SAVE));
+		t.add(new SessionTools(SessionTools.Mode.OPEN));
+		t.add(new SessionTools(SessionTools.Mode.RESTART));
 		return t;
 	}
 }
