@@ -25,6 +25,12 @@ import org.openstreetmap.josm.plugins.josmmcp.tools.CaptureMapView;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateNode;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateWay;
+import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadArea;
+import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadIncomplete;
+import org.openstreetmap.josm.plugins.josmmcp.tools.ImageryTools;
+import org.openstreetmap.josm.plugins.josmmcp.tools.PendingChangesSummary;
+import org.openstreetmap.josm.plugins.josmmcp.tools.ReadElements;
+import org.openstreetmap.josm.plugins.josmmcp.tools.ReadHistory;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteNode;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteWay;
@@ -63,6 +69,15 @@ public final class ToolRegistry {
 		t.add(new CaptureMapView());
 		t.add(new SetLayerVisibility());
 		t.add(new ValidateTool());
+		t.add(new ReadElements());
+		t.add(new ReadHistory());
+		t.add(new PendingChangesSummary());
+		// Layers and downloads
+		t.add(new DownloadArea());
+		t.add(new DownloadIncomplete());
+		t.add(new ImageryTools(ImageryTools.Mode.LIST));
+		t.add(new ImageryTools(ImageryTools.Mode.ADD));
+		t.add(new ImageryTools(ImageryTools.Mode.REMOVE));
 		// Nodes
 		t.add(new CreateNode());
 		t.add(new ReadNode());

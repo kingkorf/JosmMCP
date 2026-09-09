@@ -27,6 +27,10 @@ With an access token configured, add `--header "Authorization: Bearer <token>"`.
 | `josmmcp.token` | empty | When set, every request needs `Authorization: Bearer <token>` (applies immediately) |
 | `josmmcp.readonly` | `false` | Block all tools that modify data or files (applies immediately) |
 | `josmmcp.max_output_chars` | `200000` | Truncate longer tool results with a notice; `0` disables |
+| `josmmcp.confirm_destructive` | `true` | Ask in JOSM before deletes and geometry replacements |
+| `josmmcp.confirm_timeout_seconds` | `60` | Deny automatically after this many seconds |
+| `josmmcp.audit` | `true` | Append modifying calls to `josmmcp-audit.log` |
+| `josmmcp.allow.<group>` | `true` | Enable a tool group: `view`, `tags`, `geometry`, `delete`, `history`, `files`, `download` |
 
 ### Security
 
@@ -38,22 +42,25 @@ With an access token configured, add `--header "Authorization: Bearer <token>"`.
 
 ## Tools
 
-Read tools return JSON (also as MCP structured content). Every edit is one or more JOSM undo steps.
+Read tools return JSON, also as MCP structured content with an output schema. Every edit is one or more JOSM undo steps.
 
 **Inspect**
 
 * `get_josm_state` – version, layers (with visibility), counts and downloaded bounds of the active layer
 * `get_user_selection` – the objects currently selected in JOSM
-* `search_elements` – JOSM search syntax, with `bbox`, `fields`, `offset` and `max_results`
+* `search_elements` – JOSM search syntax, with `bbox`, `fields`, `offset` and `max_results`; runs off the UI thread under the dataset's read lock
+* `read_elements` – many objects in one call, optionally with node coordinates
+* `read_history` – version history of an object from the OSM server
+* `pending_changes_summary` – counts, tag keys, bbox and undo history of the pending changes, for drafting a changeset comment
 * `select_elements` – select objects in JOSM (optionally zoom to them) so the mapper sees them
-* `capture_map_view` – render the map view (data plus imagery) to an image, optionally zooming to an element or bbox first; returns the image bounds
-* `set_layer_visibility` – show/hide a layer or set its opacity, e.g. to look at imagery under an overlay
+* `capture_map_view` – render the map view (data plus imagery) to an image, optionally zooming to an element or bbox first and restoring the view afterwards
+* `set_layer_visibility` – show/hide a layer or set its opacity
 * `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection or the whole layer; `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes
 
 **Nodes, ways, relations**
 
 * `create_node`, `read_node`, `update_node` (move), `delete_node`
-* `create_way`, `read_way` (with `include_nodes` for coordinates), `update_way_nodes`, `replace_geometry`, `delete_way`
+* `create_way`, `read_way` (with `include_nodes`), `update_way_nodes`, `replace_geometry`, `delete_way`
 * `create_relation`, `read_relation`, `update_relation_members`, `delete_relation`
 
 `replace_geometry` gives an existing way a new outline while keeping its id, tags and history: untagged nodes used only by that way are moved or reused, nodes shared with other ways (fences, neighbours) or carrying tags are never moved, and surplus nodes are deleted. Delete tools remove the object from referencing ways and relations like JOSM's Delete does.
@@ -63,12 +70,27 @@ Read tools return JSON (also as MCP structured content). Every edit is one or mo
 * `modify_tags` – add, change or remove tags on one element (empty value removes)
 * `modify_tags_batch` – the same for many elements as a single undo step
 
+**Layers and downloads**
+
+* `download_area` – download a bbox from the OSM server into the active or a new layer (API limit of 0.25 square degrees enforced)
+* `download_incomplete` – complete relations or incomplete stubs
+* `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue
+* `remove_layer` – remove a layer; data layers with unsaved changes are refused unless forced, the active data layer never
+
 **History and files**
 
 * `undo`, `redo`, `list_commands` – JOSM's undo/redo stack
 * `revert_to_server` – reload objects from the server, discarding local changes to them (File → Update selection)
 * `save_layer` – write the active layer to an .osm file, so pending edits survive a restart
 * `open_file` – open a local file as a new layer
+
+## Permissions, confirmation and audit
+
+Every tool belongs to a group: read, view, tags, geometry, delete, history, files, download. In the preferences each group can be switched off, independently of the global read-only mode. Groups map to the MCP annotations `readOnlyHint` and `destructiveHint`.
+
+By default JOSM shows a dialog before any delete or geometry replacement, naming the tool and the object, with Allow/Deny and a timeout (default 60 seconds, no answer means no). Denied calls return an error to the client and nothing changes.
+
+Every modifying tool call is appended to `josmmcp-audit.log` in JOSM's user data directory: timestamp, tool, arguments, outcome. Both can be switched off in the preferences.
 
 ## Resources and prompts
 
@@ -78,7 +100,8 @@ Resources `josm://state` and `josm://selection` expose the same JSON as the corr
 
 * Validation checks that other plugins add through their own upload hook, such as PT_Assistant's route checks, are not reachable through `validate`; they only appear in JOSM's upload dialog.
 * JOSM cannot reload a plugin at runtime. After installing a new jar, restart JOSM; save your layer first.
-* Tool calls run on JOSM's event dispatch thread, so very large searches briefly block the UI.
+* The transport is stateless streamable HTTP: no progress notifications or server-initiated updates.
+* Most tool calls run on JOSM's event dispatch thread; searches are the exception and run under a read lock.
 
 ## Building
 
@@ -88,7 +111,7 @@ Requirements: JDK 17 or newer and [Maven](https://maven.apache.org/).
 mvn clean package
 ```
 
-The first build downloads `josm-latest.jar` into the `lib` folder (JOSM is not published to Maven Central). Delete that file to pick up a newer JOSM. The resulting plugin jar with all dependencies is `target/josmmcp.jar`. The test suite starts the real server on an ephemeral port and exercises the tool list, the security filter, read-only mode, resources and prompts.
+The first build downloads `josm-latest.jar` into the `lib` folder (JOSM is not published to Maven Central). Delete that file to pick up a newer JOSM. The resulting plugin jar with all dependencies is `target/josmmcp.jar`. The test suite starts the real server on an ephemeral port and exercises the tool list, the security filter, read-only mode, resources and prompts, and runs the editing tools against an in-memory layer. Tagged commits `v*` are built and published as GitHub releases.
 
 ## Installing the plugin in JOSM
 
