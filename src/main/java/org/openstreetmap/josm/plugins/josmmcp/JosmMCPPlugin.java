@@ -17,14 +17,16 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.openstreetmap.josm.plugins.Plugin;
 import org.openstreetmap.josm.plugins.PluginInformation;
+import org.openstreetmap.josm.plugins.josmmcp.tools.CaptureMapView;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateNode;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteNode;
@@ -36,8 +38,12 @@ import org.openstreetmap.josm.plugins.josmmcp.tools.ReadNode;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.SearchTool;
+import org.openstreetmap.josm.plugins.josmmcp.tools.SetLayerVisibility;
 import org.openstreetmap.josm.plugins.josmmcp.tools.StateTool;
 import org.openstreetmap.josm.plugins.josmmcp.tools.UpdateNode;
+import org.openstreetmap.josm.plugins.josmmcp.tools.UpdateRelation;
+import org.openstreetmap.josm.plugins.josmmcp.tools.ValidateTool;
+import org.openstreetmap.josm.spi.preferences.Config;
 import org.openstreetmap.josm.tools.Logging;
 
 import io.modelcontextprotocol.server.McpServer;
@@ -46,14 +52,26 @@ import io.modelcontextprotocol.server.McpStatelessServerFeatures;
 import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport;
 
 public class JosmMCPPlugin extends Plugin {
+	/** Preference key for the TCP port the MCP server listens on. */
+	public static final String PREF_PORT = "josmmcp.port";
+	/** Preference key for the address the MCP server binds to. */
+	public static final String PREF_HOST = "josmmcp.host";
+	public static final int DEFAULT_PORT = 3000;
+	/** Loopback only: the server has no authentication, so never expose it on the network by default. */
+	public static final String DEFAULT_HOST = "127.0.0.1";
+
 	private Server jettyServer;
 
 	public JosmMCPPlugin(PluginInformation info) {
 		super(info);
 
 		Logging.info("JosmMCPPlugin initialization");
+		String host = Config.getPref().get(PREF_HOST, DEFAULT_HOST);
+		int port = Config.getPref().getInt(PREF_PORT, DEFAULT_PORT);
 		try {
-			this.jettyServer = new Server(3000);
+			this.jettyServer = new Server(new InetSocketAddress(host, port));
+			// JOSM offers no plugin unload hook; make sure the port is released when the JVM exits.
+			jettyServer.setStopAtShutdown(true);
 			ServletContextHandler context = new ServletContextHandler();
 			context.setContextPath("/");
 			jettyServer.setHandler(context);
@@ -62,6 +80,9 @@ public class JosmMCPPlugin extends Plugin {
 			toolSpecs.add(new SearchTool().getSpec());
 			toolSpecs.add(new StateTool().getSpec());
 			toolSpecs.add(new GetUserSelection().getSpec());
+			toolSpecs.add(new CaptureMapView().getSpec());
+			toolSpecs.add(new ValidateTool().getSpec());
+			toolSpecs.add(new SetLayerVisibility().getSpec());
 
 			toolSpecs.add(new ModifyTags().getSpec());
 
@@ -80,7 +101,7 @@ public class JosmMCPPlugin extends Plugin {
 			// CRUD Operations on Relations
 			//toolSpecs.add(new CreateRelation().getSpec());
 			toolSpecs.add(new ReadRelation().getSpec());
-			//toolSpecs.add(new UpdateRelation().getSpec());
+			toolSpecs.add(new UpdateRelation().getSpec());
 			toolSpecs.add(new DeleteRelation().getSpec());
 
 			HttpServletStatelessServerTransport servlet = HttpServletStatelessServerTransport.builder().build();
@@ -88,22 +109,9 @@ public class JosmMCPPlugin extends Plugin {
 					.tools(toolSpecs).build();
 			context.addServlet(new ServletHolder(servlet), "/mcp");
 			jettyServer.start();
-			Logging.info("MCP HTTP server started on port 3000");
+			Logging.info(String.format("MCP HTTP server started on http://%s:%d/mcp", host, port));
 		} catch (Exception e) {
-			Logging.error("Failed to start MCP server: " + e.getMessage(), e);
+			Logging.error(String.format("Failed to start MCP server on %s:%d: %s", host, port, e.getMessage()), e);
 		}
-	}
-
-	@Override
-	protected void finalize() throws Throwable {
-		if (jettyServer != null && jettyServer.isRunning()) {
-			try {
-				jettyServer.stop();
-				Logging.info("MCP HTTP server stopped");
-			} catch (Exception e) {
-				Logging.error("Failed to stop MCP server: " + e.getMessage(), e);
-			}
-		}
-		super.finalize();
 	}
 }
