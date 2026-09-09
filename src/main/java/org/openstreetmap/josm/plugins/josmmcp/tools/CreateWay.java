@@ -92,4 +92,9 @@ public class CreateWay extends BaseTool {
 		UndoRedoHandler.getInstance().add(c);
 		return Long.toString(w.getUniqueId());
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
 }

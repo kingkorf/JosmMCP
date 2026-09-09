@@ -79,4 +79,14 @@ public class DeleteNode extends BaseTool {
 		UndoRedoHandler.getInstance().add(c);
 		return "Node " + id + " deleted";
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
+
+	@Override
+	public boolean isDestructive() {
+		return true;
+	}
 }

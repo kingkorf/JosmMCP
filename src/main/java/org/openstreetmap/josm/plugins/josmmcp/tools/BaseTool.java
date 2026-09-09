@@ -17,6 +17,7 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -25,9 +26,14 @@ import java.util.concurrent.FutureTask;
 
 import javax.swing.SwingUtilities;
 
+import org.openstreetmap.josm.plugins.josmmcp.Prefs;
 import org.openstreetmap.josm.tools.Logging;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.modelcontextprotocol.server.McpStatelessServerFeatures;
+import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Content;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -35,28 +41,78 @@ import io.modelcontextprotocol.spec.McpSchema.Tool;
 import reactor.core.publisher.Mono;
 
 public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp.tools.Tool {
+	private static final ObjectMapper JSON = new ObjectMapper();
 
 	public McpStatelessServerFeatures.AsyncToolSpecification getSpec() {
+		McpSchema.ToolAnnotations annotations = new McpSchema.ToolAnnotations(null, !isWriteTool(), isDestructive(),
+				null, false, null);
 		io.modelcontextprotocol.spec.McpSchema.Tool tool = Tool.builder().name(this.getName())
-				.description(this.getDescription()).inputSchema(this.getInputSchema()).build();
+				.description(this.getDescription()).inputSchema(this.getInputSchema()).annotations(annotations).build();
 
 		McpStatelessServerFeatures.AsyncToolSpecification spec = new McpStatelessServerFeatures.AsyncToolSpecification(
 				tool, (exchange, params) -> {
 					Logging.info(String.format("Tool '%s' called with params: %s", this.getName(), params.arguments()));
+					if (isWriteTool() && Prefs.readOnly()) {
+						return Mono.just(error("JosmMCP is in read-only mode; '" + getName()
+								+ "' modifies data and is disabled. Change this in JOSM's preferences (JosmMCP)."));
+					}
 					try {
 						Map<String, Object> args = params.arguments();
 						List<Content> result = this.execute(args);
 						Logging.debug(String.format("Returning '%s' result: %s", this.getName(), result));
-						return Mono.just(CallToolResult.builder().content(result).isError(false).build());
+						return Mono.just(buildResult(result));
 					} catch (Exception e) {
 						String message = e.getMessage() != null ? e.getMessage() : e.toString();
 						Logging.error(String.format("Exception in '%s' - message: %s", this.getName(), message));
 						Logging.debug(e);
-						return Mono.just(CallToolResult.builder().content(Arrays.asList(new TextContent(message)))
-								.isError(true).build());
+						return Mono.just(error(message));
 					}
 				});
 		return spec;
+	}
+
+	private static CallToolResult error(String message) {
+		return CallToolResult.builder().content(Arrays.asList(new TextContent(message))).isError(true).build();
+	}
+
+	/**
+	 * Applies the output size limit to text content and, when the (single) text result is a
+	 * JSON object, also returns it as structured content.
+	 */
+	private static CallToolResult buildResult(List<Content> content) {
+		int limit = Prefs.maxOutputChars();
+		List<Content> out = new ArrayList<>(content.size());
+		Object structured = null;
+		for (Content c : content) {
+			if (c instanceof TextContent) {
+				String text = ((TextContent) c).text();
+				if (text != null && text.length() > limit) {
+					int omitted = text.length() - limit;
+					text = text.substring(0, limit) + "\n... [output truncated, " + omitted
+							+ " characters omitted; narrow the request with max_results, fields, offset or a bbox]";
+				} else if (structured == null && content.size() == 1 && text != null && text.startsWith("{")) {
+					try {
+						structured = JSON.readValue(text, new TypeReference<Map<String, Object>>() {
+						});
+					} catch (Exception e) {
+						structured = null;
+					}
+				}
+				out.add(new TextContent(text));
+			} else {
+				out.add(c);
+			}
+		}
+		CallToolResult.Builder b = CallToolResult.builder().content(out).isError(false);
+		if (structured != null) {
+			b.structuredContent(structured);
+		}
+		return b.build();
+	}
+
+	/** Runs the tool like a client would, returning the text result; used for MCP resources. */
+	public String callForResource(Map<String, Object> args) throws Exception {
+		return runInEDT(() -> this.handle(args));
 	}
 
 	/**

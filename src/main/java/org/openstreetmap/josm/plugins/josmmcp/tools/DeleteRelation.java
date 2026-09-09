@@ -79,4 +79,14 @@ public class DeleteRelation extends BaseTool {
 		UndoRedoHandler.getInstance().add(c);
 		return "Relation " + id + " deleted";
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
+
+	@Override
+	public boolean isDestructive() {
+		return true;
+	}
 }

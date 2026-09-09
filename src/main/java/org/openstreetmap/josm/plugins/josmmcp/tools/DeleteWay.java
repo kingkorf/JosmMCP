@@ -80,4 +80,14 @@ public class DeleteWay extends BaseTool {
 		UndoRedoHandler.getInstance().add(c);
 		return "Way " + id + " deleted (including its untagged, otherwise unused nodes)";
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
+
+	@Override
+	public boolean isDestructive() {
+		return true;
+	}
 }

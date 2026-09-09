@@ -77,4 +77,9 @@ public class CreateNode extends BaseTool {
 		UndoRedoHandler.getInstance().add(c);
 		return Long.toString(nd.getUniqueId());
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
 }

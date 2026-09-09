@@ -121,4 +121,9 @@ public class UpdateRelation extends BaseTool {
 		UndoRedoHandler.getInstance().add(new ChangeCommand(rel, updated));
 		return "Relation " + id + " now has " + members.size() + " members (was " + rel.getMembersCount() + ")";
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
 }

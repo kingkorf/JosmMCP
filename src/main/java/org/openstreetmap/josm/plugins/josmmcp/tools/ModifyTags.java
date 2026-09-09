@@ -108,4 +108,9 @@ public class ModifyTags extends BaseTool {
 		UndoRedoHandler.getInstance().add(c);
 		return "Tags of " + type + " " + id + " updated";
 	}
+
+	@Override
+	public boolean isWriteTool() {
+		return true;
+	}
 }

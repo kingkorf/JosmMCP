@@ -22,11 +22,21 @@ import java.util.Map;
 import io.modelcontextprotocol.spec.McpSchema;
 
 public interface Tool {
-	public String getName();
+	String getName();
 
-	public String getDescription();
+	String getDescription();
 
-	public McpSchema.JsonSchema getInputSchema();
+	McpSchema.JsonSchema getInputSchema();
 
-	public String handle(Map<String, Object> args) throws Exception;
+	String handle(Map<String, Object> args) throws Exception;
+
+	/** True when the tool changes OSM data or files; such tools are blocked in read-only mode. */
+	default boolean isWriteTool() {
+		return false;
+	}
+
+	/** True when the tool deletes data (reported to clients as destructiveHint). */
+	default boolean isDestructive() {
+		return false;
+	}
 }
