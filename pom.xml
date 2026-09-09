@@ -4,102 +4,165 @@
 
   <groupId>org.openstreetmap.josm.plugins</groupId>
   <artifactId>josmmcp</artifactId>
-  <version>0.0.2-SNAPSHOT</version>
+  <version>0.0.5-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>josmmcp</name>
-  <url>http://maven.apache.org</url>
+  <description>JOSM plugin exposing the editor to Model Context Protocol clients</description>
+  <url>https://github.com/fansanelli/JosmMCP</url>
+
+  <licenses>
+    <license>
+      <name>GNU General Public License v3.0 or later</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+    </license>
+  </licenses>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.release>17</maven.compiler.release>
+
+    <!-- The lowest JOSM version required by this plugin. -->
+    <josm.mainversion>18700</josm.mainversion>
+    <!-- JOSM is not published to Maven Central; the jar is downloaded into lib/ at build time. -->
+    <josm.jar>${project.basedir}/lib/josm-latest.jar</josm.jar>
+    <josm.download.url>https://josm.openstreetmap.de/josm-latest.jar</josm.download.url>
+
+    <mcp.version>0.17.2</mcp.version>
+    <jetty.version>12.0.39</jetty.version>
+    <slf4j.version>2.0.19</slf4j.version>
+    <junit.version>5.14.4</junit.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>org.openstreetmap.josm</groupId>
-      <artifactId>josm-latest</artifactId>
+      <artifactId>josm</artifactId>
       <version>latest</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/lib/josm-latest.jar</systemPath>
+      <systemPath>${josm.jar}</systemPath>
     </dependency>
+
     <dependency>
       <groupId>io.modelcontextprotocol.sdk</groupId>
       <artifactId>mcp</artifactId>
-      <version>0.17.2</version>
+      <version>${mcp.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
-      <version>11.0.20</version>
+      <version>${jetty.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-servlet</artifactId>
-      <version>11.0.20</version>
-    </dependency>
-    <dependency>
-      <groupId>jakarta.servlet</groupId>
-      <artifactId>jakarta.servlet-api</artifactId>
-      <version>5.0.0</version>
+      <groupId>org.eclipse.jetty.ee10</groupId>
+      <artifactId>jetty-ee10-servlet</artifactId>
+      <version>${jetty.version}</version>
     </dependency>
 
+    <!-- Route Jetty/Reactor SLF4J logging into java.util.logging, which JOSM uses. -->
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-simple</artifactId>
-      <version>2.0.9</version>
+      <artifactId>slf4j-jdk14</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
 
   <build>
+    <!-- JOSM plugin jars are conventionally named after the plugin. -->
+    <finalName>josmmcp</finalName>
+
     <plugins>
+      <!-- Fetch the JOSM jar once; skipped when lib/josm-latest.jar already exists. -->
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>3.6.0</version>
-        <configuration>
-          <archive>
-            <manifest>
-              <mainClass>org.openstreetmap.josm.plugins.josmdestinationviewer.JosmDestinationViewer</mainClass>
-            </manifest>
-            <manifestEntries>
-              <!-- The lowest JOSM version required by this plugin. -->
-              <Plugin-Mainversion>18700</Plugin-Mainversion>
-              <!-- The plugin version -->
-              <Plugin-Version>0.0.2-SNAPSHOT</Plugin-Version>
-              <!-- Points to the main class of the plugin -->
-              <Plugin-Class>org.openstreetmap.josm.plugins.josmmcp.JosmMCPPlugin</Plugin-Class>
-              <!-- Gives the description of the plugin visible in the preferences page -->
-              <Plugin-Description>This plugin allows advanced interactions with LLMs.</Plugin-Description>
-              <!-- The name and or email address of the author of this plugin -->
-              <Author>fansanelli</Author>
-              <!-- Should be set to true if the plugin can be installed without restart -->
-              <Plugin-Canloadatruntime>true</Plugin-Canloadatruntime>
-            </manifestEntries>
-          </archive>
-          <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
-          </descriptorRefs>
-        </configuration>
+        <groupId>com.googlecode.maven-download-plugin</groupId>
+        <artifactId>download-maven-plugin</artifactId>
+        <version>1.13.0</version>
         <executions>
           <execution>
-            <id>make-assembly</id>
+            <id>download-josm</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>${josm.download.url}</url>
+              <outputDirectory>${project.basedir}/lib</outputDirectory>
+              <outputFileName>josm-latest.jar</outputFileName>
+              <overwrite>false</overwrite>
+              <skipCache>true</skipCache>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.6</version>
+      </plugin>
+
+      <!--
+        Bundle all dependencies into a single plugin jar. Unlike the assembly plugin's
+        jar-with-dependencies, shade merges META-INF/services files, which Jetty and
+        Jackson rely on for ServiceLoader lookups.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions>
+          <execution>
             <phase>package</phase>
             <goals>
-              <goal>single</goal>
+              <goal>shade</goal>
             </goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/versions/**/module-info.class</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>META-INF/LICENSE*</exclude>
+                    <exclude>META-INF/NOTICE*</exclude>
+                    <exclude>META-INF/DEPENDENCIES</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Plugin-Mainversion>${josm.mainversion}</Plugin-Mainversion>
+                    <Plugin-Version>${project.version}</Plugin-Version>
+                    <Plugin-Class>org.openstreetmap.josm.plugins.josmmcp.JosmMCPPlugin</Plugin-Class>
+                    <Plugin-Description>Exposes JOSM to Model Context Protocol (MCP) clients such as LLM assistants.</Plugin-Description>
+                    <Plugin-Link>${project.url}</Plugin-Link>
+                    <Author>fansanelli</Author>
+                    <Plugin-Canloadatruntime>true</Plugin-Canloadatruntime>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+            </configuration>
           </execution>
         </executions>
       </plugin>
     </plugins>
+
     <resources>
       <resource>
         <directory>${project.basedir}</directory>
