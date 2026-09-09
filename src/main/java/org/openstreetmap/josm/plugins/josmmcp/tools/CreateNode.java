@@ -64,9 +64,12 @@ public class CreateNode extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		double latitude = (double) args.get("latitude");
-		double longitude = (double) args.get("longitude");
+		double latitude = getDouble(args, "latitude");
+		double longitude = getDouble(args, "longitude");
 		LatLon ll = new LatLon(latitude, longitude);
+		if (!ll.isValid()) {
+			throw new Exception("invalid coordinates: " + ll);
+		}
 		Node nd = new Node(ll);
 
 		AddCommand c = new AddCommand(ds, nd);

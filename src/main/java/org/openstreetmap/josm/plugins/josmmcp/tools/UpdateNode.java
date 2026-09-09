@@ -49,7 +49,7 @@ public class UpdateNode extends BaseTool {
 	public JsonSchema getInputSchema() {
 		Map<String, Object> editProps = new HashMap<>();
 		Map<String, Object> idProp = new HashMap<>();
-		idProp.put("type", "number");
+		idProp.put("type", "integer");
 		editProps.put("id", idProp);
 		Map<String, Object> latProp = new HashMap<>();
 		latProp.put("type", "number");
@@ -69,16 +69,22 @@ public class UpdateNode extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		long id = Long.parseLong(args.get("id").toString());
+		long id = getLong(args, "id");
 		Node nd = (Node) ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.NODE));
+		if (nd == null) {
+			throw new Exception("Node with id " + id + " not found");
+		}
 
-		double latitude = (double) args.get("latitude");
-		double longitude = (double) args.get("longitude");
+		double latitude = getDouble(args, "latitude");
+		double longitude = getDouble(args, "longitude");
 		LatLon ll = new LatLon(latitude, longitude);
+		if (!ll.isValid()) {
+			throw new Exception("invalid coordinates: " + ll);
+		}
 
 		MoveCommand c = new MoveCommand(nd, ll);
 		UndoRedoHandler.getInstance().add(c);
 
-		return "";
+		return "Node " + id + " moved to " + ll;
 	}
 }

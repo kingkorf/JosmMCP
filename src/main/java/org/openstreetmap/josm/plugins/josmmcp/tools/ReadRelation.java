@@ -47,7 +47,7 @@ public class ReadRelation extends BaseTool {
 	public JsonSchema getInputSchema() {
 		Map<String, Object> readProps = new HashMap<>();
 		Map<String, Object> idProp = new HashMap<>();
-		idProp.put("type", "number");
+		idProp.put("type", "integer");
 		readProps.put("id", idProp);
 		McpSchema.JsonSchema readSchema = new McpSchema.JsonSchema("object", readProps, Arrays.asList("id"), null, null,
 				null);
@@ -61,7 +61,7 @@ public class ReadRelation extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		long id = Long.parseLong(args.get("id").toString());
+		long id = getLong(args, "id");
 		Relation r = (Relation) ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.RELATION));
 		if (r == null) {
 			throw new Exception("Relation with id " + id + " not found");

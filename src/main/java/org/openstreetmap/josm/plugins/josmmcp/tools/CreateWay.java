@@ -17,6 +17,7 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -51,7 +52,7 @@ public class CreateWay extends BaseTool {
 		Map<String, Object> createProps = new HashMap<>();
 		Map<String, Object> nodesProp = new HashMap<>();
 		nodesProp.put("type", "array");
-		nodesProp.put("items", Map.of("type", "number"));
+		nodesProp.put("items", Map.of("type", "integer"));
 		createProps.put("node_ids", nodesProp);
 		McpSchema.JsonSchema createSchema = new McpSchema.JsonSchema("object", createProps, Arrays.asList("node_ids"),
 				null, null, null);
@@ -65,9 +66,18 @@ public class CreateWay extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		@SuppressWarnings("unchecked")
-		List<Long> nodes = ((List<Object>) args.get("node_ids")).stream().map(obj -> Long.parseLong(obj.toString()))
-				.toList();
+		Object nodeIdsObj = requireArg(args, "node_ids");
+		if (!(nodeIdsObj instanceof List)) {
+			throw new Exception("node_ids must be an array");
+		}
+		List<Long> nodes = new ArrayList<>();
+		for (Object obj : (List<?>) nodeIdsObj) {
+			nodes.add(toLong(obj, "node_ids"));
+		}
+		if (nodes.size() < 2) {
+			throw new Exception("a way needs at least 2 nodes");
+		}
+
 		Way w = new Way();
 		for (long id : nodes) {
 			Node nd = (Node) ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.NODE));

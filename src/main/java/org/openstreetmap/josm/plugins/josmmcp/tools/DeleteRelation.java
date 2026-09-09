@@ -18,9 +18,11 @@
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.openstreetmap.josm.command.Command;
 import org.openstreetmap.josm.command.DeleteCommand;
 import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
@@ -48,7 +50,7 @@ public class DeleteRelation extends BaseTool {
 	public JsonSchema getInputSchema() {
 		Map<String, Object> deleteProps = new HashMap<>();
 		Map<String, Object> idProp = new HashMap<>();
-		idProp.put("type", "number");
+		idProp.put("type", "integer");
 		deleteProps.put("id", idProp);
 		McpSchema.JsonSchema deleteSchema = new McpSchema.JsonSchema("object", deleteProps, Arrays.asList("id"), null,
 				null, null);
@@ -62,14 +64,19 @@ public class DeleteRelation extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		long id = Long.parseLong(args.get("id").toString());
+		long id = getLong(args, "id");
 		Relation r = (Relation) ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.RELATION));
 		if (r == null) {
 			throw new Exception("Relation with id " + id + " not found");
 		}
 
-		DeleteCommand c = new DeleteCommand(ds, r);
+		// DeleteCommand.delete() also removes the primitive from referencing ways/relations,
+		// unlike the plain constructor which would leave dangling references behind.
+		Command c = DeleteCommand.delete(Collections.singleton(r), false, true);
+		if (c == null) {
+			throw new Exception("Relation with id " + id + " could not be deleted");
+		}
 		UndoRedoHandler.getInstance().add(c);
-		return "";
+		return "Relation " + id + " deleted";
 	}
 }

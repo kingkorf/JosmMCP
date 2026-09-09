@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -57,14 +59,14 @@ public class ModifyTags extends BaseTool {
 		elTypeProp.put("enum", new ArrayList<String>(Arrays.asList("node", "way", "relation")));
 		modifyProps.put("element_type", elTypeProp);
 		Map<String, Object> elementIdProp = new HashMap<>();
-		elementIdProp.put("type", "number");
+		elementIdProp.put("type", "integer");
 		modifyProps.put("element_id", elementIdProp);
 
 		Map<String, Object> tagsProp = new HashMap<>();
-		tagsProp.put("type", "object"); // Definisci 'tags' come oggetto
-		tagsProp.put("additionalProperties", Map.of("type", "string", // Ogni valore deve essere una stringa
-				"maxLength", 255 // Lunghezza massima per il valore
-		));
+		tagsProp.put("type", "object");
+		tagsProp.put("description", "Map of tag key to value; a null or empty value removes the tag");
+		// Every value must be a string of at most 255 characters (the OSM API limit).
+		tagsProp.put("additionalProperties", Map.of("type", "string", "maxLength", 255));
 		modifyProps.put("tags", tagsProp);
 		McpSchema.JsonSchema modifySchema = new McpSchema.JsonSchema("object", modifyProps,
 				Arrays.asList("element_type", "element_id", "tags"), null, null, null);
@@ -79,30 +81,31 @@ public class ModifyTags extends BaseTool {
 		}
 
 		String type = (String) args.get("element_type");
-		long id = Long.parseLong(args.get("element_id").toString());
+		long id = getLong(args, "element_id");
 		OsmPrimitive el = ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.from(type)));
 		if (el == null) {
 			throw new Exception(type + " with id " + id + " not found");
 		}
 
-		Collection<Command> cmds = new LinkedList<>();
-		Object tagsObj = args.get("tags");
-		if (tagsObj != null) {
-			if (!(tagsObj instanceof Map)) {
-				throw new Exception("tags must be a map/object");
-			}
-			@SuppressWarnings("unchecked")
-			Map<String, Object> tagsMap = (Map<String, Object>) tagsObj;
-
-			for (Map.Entry<String, Object> entry : tagsMap.entrySet()) {
-				String key = entry.getKey();
-				String value = entry.getValue() == null ? "" : entry.getValue().toString();
-				cmds.add(new ChangePropertyCommand(el, key, value));
-			}
+		Object tagsObj = requireArg(args, "tags");
+		if (!(tagsObj instanceof Map)) {
+			throw new Exception("tags must be a map/object");
+		}
+		@SuppressWarnings("unchecked")
+		Map<String, Object> tagsMap = (Map<String, Object>) tagsObj;
+		if (tagsMap.isEmpty()) {
+			throw new Exception("tags must not be empty");
 		}
 
-		Command c = new SequenceCommand("", cmds, false);
+		Collection<Command> cmds = new LinkedList<>();
+		for (Map.Entry<String, Object> entry : tagsMap.entrySet()) {
+			String key = entry.getKey();
+			String value = entry.getValue() == null ? "" : entry.getValue().toString();
+			cmds.add(new ChangePropertyCommand(el, key, value));
+		}
+
+		Command c = new SequenceCommand(tr("Modify tags of {0} {1} (MCP)", type, id), cmds, false);
 		UndoRedoHandler.getInstance().add(c);
-		return "";
+		return "Tags of " + type + " " + id + " updated";
 	}
 }

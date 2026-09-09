@@ -18,9 +18,11 @@
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.openstreetmap.josm.command.Command;
 import org.openstreetmap.josm.command.DeleteCommand;
 import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
@@ -48,7 +50,7 @@ public class DeleteWay extends BaseTool {
 	public JsonSchema getInputSchema() {
 		Map<String, Object> deleteProps = new HashMap<>();
 		Map<String, Object> idProp = new HashMap<>();
-		idProp.put("type", "number");
+		idProp.put("type", "integer");
 		deleteProps.put("id", idProp);
 		McpSchema.JsonSchema deleteSchema = new McpSchema.JsonSchema("object", deleteProps, Arrays.asList("id"), null,
 				null, null);
@@ -62,14 +64,20 @@ public class DeleteWay extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		long id = Long.parseLong(args.get("id").toString());
+		long id = getLong(args, "id");
 		Way w = (Way) ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.WAY));
 		if (w == null) {
 			throw new Exception("Way with id " + id + " not found");
 		}
 
-		DeleteCommand c = new DeleteCommand(ds, w);
+		// DeleteCommand.delete() also removes the primitive from referencing ways/relations,
+		// unlike the plain constructor which would leave dangling references behind.
+		// alsoDeleteNodesInWay=true: drop untagged nodes used by no other way, as JOSM's Delete does.
+		Command c = DeleteCommand.delete(Collections.singleton(w), true, true);
+		if (c == null) {
+			throw new Exception("Way with id " + id + " could not be deleted");
+		}
 		UndoRedoHandler.getInstance().add(c);
-		return "";
+		return "Way " + id + " deleted (including its untagged, otherwise unused nodes)";
 	}
 }
