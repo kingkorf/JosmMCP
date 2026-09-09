@@ -29,7 +29,6 @@ import java.util.Map;
 import org.openstreetmap.josm.command.ChangePropertyCommand;
 import org.openstreetmap.josm.command.Command;
 import org.openstreetmap.josm.command.SequenceCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
@@ -74,6 +73,26 @@ public class ModifyTags extends BaseTool {
 	}
 
 	@Override
+	protected boolean requiresConfirmation(Map<String, Object> args) throws Exception {
+		if (args == null || !"relation".equals(String.valueOf(args.get("element_type")))) {
+			return false;
+		}
+		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
+		if (ds == null) {
+			return false;
+		}
+		OsmPrimitive r = ds.getPrimitiveById(new SimplePrimitiveId(toLong(args.get("element_id"), "element_id"), OsmPrimitiveType.RELATION));
+		return r instanceof org.openstreetmap.josm.data.osm.Relation
+				&& ((org.openstreetmap.josm.data.osm.Relation) r).getMembersCount() > ModifyTagsBatch.CONFIRM_RELATION_MEMBERS;
+	}
+
+	@Override
+	protected String describeForConfirmation(Map<String, Object> args) {
+		return "Change tags " + args.get("tags") + " on relation " + args.get("element_id") + ", which has more than "
+				+ ModifyTagsBatch.CONFIRM_RELATION_MEMBERS + " members";
+	}
+
+	@Override
 	public String handle(Map<String, Object> args) throws Exception {
 		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
 		if (ds == null) {
@@ -105,7 +124,7 @@ public class ModifyTags extends BaseTool {
 		}
 
 		Command c = new SequenceCommand(tr("Modify tags of {0} {1} (MCP)", type, id), cmds, false);
-		UndoRedoHandler.getInstance().add(c);
+		addCommand(c, c.getDescriptionText());
 		return "Tags of " + type + " " + id + " updated";
 	}
 

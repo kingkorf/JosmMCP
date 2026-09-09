@@ -17,12 +17,13 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.openstreetmap.josm.command.AddCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
@@ -74,7 +75,7 @@ public class CreateNode extends BaseTool {
 
 		AddCommand c = new AddCommand(ds, nd);
 
-		UndoRedoHandler.getInstance().add(c);
+		addCommand(c, tr("Create node {0}", nd.getUniqueId()));
 		return Long.toString(nd.getUniqueId());
 	}
 

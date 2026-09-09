@@ -34,7 +34,6 @@ import org.openstreetmap.josm.command.Command;
 import org.openstreetmap.josm.command.DeleteCommand;
 import org.openstreetmap.josm.command.MoveCommand;
 import org.openstreetmap.josm.command.SequenceCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
@@ -197,7 +196,7 @@ public class ReplaceGeometry extends BaseTool {
 				droppedFixed++;
 			}
 		}
-		UndoRedoHandler.getInstance().add(new SequenceCommand(tr("Replace geometry of way {0} (MCP)", id), cmds, false));
+		addCommand(new SequenceCommand(tr("Replace geometry of way {0}", id), cmds, false), tr("Replace geometry of way {0}", id));
 
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("way", id);

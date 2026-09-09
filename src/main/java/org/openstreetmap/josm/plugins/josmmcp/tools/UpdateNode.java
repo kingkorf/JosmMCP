@@ -17,12 +17,13 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.openstreetmap.josm.command.MoveCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
@@ -83,7 +84,7 @@ public class UpdateNode extends BaseTool {
 		}
 
 		MoveCommand c = new MoveCommand(nd, ll);
-		UndoRedoHandler.getInstance().add(c);
+		addCommand(c, tr("Move node {0}", nd.getUniqueId()));
 
 		return "Node " + id + " moved to " + ll;
 	}

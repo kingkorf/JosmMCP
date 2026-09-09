@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -168,7 +170,7 @@ public class ValidateTool extends BaseTool {
 				if (!err.isIgnored() && err.isFixable()) {
 					org.openstreetmap.josm.command.Command c = err.getFix();
 					if (c != null) {
-						org.openstreetmap.josm.data.UndoRedoHandler.getInstance().add(c);
+						addCommand(c, tr("Fix: {0}", err.getMessage()));
 						nFixed++;
 					}
 				}

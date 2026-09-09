@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.command.AddCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
@@ -99,7 +100,7 @@ public class CreateRelation extends BaseTool {
 			members.add(new RelationMember(role == null ? "" : role.toString(), p));
 		}
 		r.setMembers(members);
-		UndoRedoHandler.getInstance().add(new AddCommand(ds, r));
+		addCommand(new AddCommand(ds, r), tr("Create relation {0}", r.getUniqueId()));
 		return Long.toString(r.getUniqueId());
 	}
 

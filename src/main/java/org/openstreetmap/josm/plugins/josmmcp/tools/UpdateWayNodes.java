@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.command.ChangeNodesCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
@@ -86,7 +87,7 @@ public class UpdateWayNodes extends BaseTool {
 			nodes.add(n);
 		}
 		int before = w.getNodesCount();
-		UndoRedoHandler.getInstance().add(new ChangeNodesCommand(ds, w, nodes));
+		addCommand(new ChangeNodesCommand(ds, w, nodes), tr("Update nodes of way {0}", w.getUniqueId()));
 		return "Way " + id + " now has " + nodes.size() + " nodes (was " + before + ")";
 	}
 

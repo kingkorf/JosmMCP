@@ -54,8 +54,10 @@ public class UndoRedoTool extends BaseTool {
 	@Override
 	public String getDescription() {
 		switch (mode) {
-		case UNDO: return "Undo the last n commands on JOSM's undo stack (default 1), exactly like Edit > Undo. Returns the remaining stack.";
-		case REDO: return "Redo the last n undone commands (default 1), like Edit > Redo.";
+		case UNDO: return "Undo the last n commands on JOSM's undo stack (default 1), like Edit > Undo. Only commands made "
+				+ "through this plugin (marked '(MCP)') are undone; the mapper's own edits are refused unless force=true.";
+		case REDO: return "Redo the last n undone commands (default 1), like Edit > Redo. Refuses commands that were not made "
+				+ "through this plugin unless force=true.";
 		default: return "List JOSM's undo stack (most recent first) and redo stack, with the description of each command. Use it to see what a previous tool call changed before undoing.";
 		}
 	}
@@ -67,6 +69,9 @@ public class UndoRedoTool extends BaseTool {
 			props.put("limit", Map.of("type", "integer", "description", "Maximum number of commands to list per stack (default 20)"));
 		} else {
 			props.put("n", Map.of("type", "integer", "description", "Number of commands (default 1)"));
+			props.put("force", Map.of("type", "boolean", "description",
+					"Also " + (mode == Mode.UNDO ? "undo" : "redo") + " commands that were not made through this plugin "
+							+ "(the mapper's own edits). Default false: such commands are refused."));
 		}
 		return new McpSchema.JsonSchema("object", props, null, null, null, null);
 	}
@@ -86,9 +91,17 @@ public class UndoRedoTool extends BaseTool {
 				throw new Exception("nothing to " + getName());
 			}
 			int done = Math.min(n, stack.size());
+			boolean force = Boolean.TRUE.equals(args.get("force"));
 			List<String> descriptions = new ArrayList<>();
 			for (int i = 0; i < done; i++) {
-				descriptions.add(stack.get(stack.size() - 1 - i).getDescriptionText());
+				String desc = stack.get(stack.size() - 1 - i).getDescriptionText();
+				if (!force && !isOwn(desc)) {
+					throw new Exception("command " + (i + 1) + " on the stack ('" + desc + "') was not made through this plugin; "
+							+ (i == 0 ? "nothing was " + (mode == Mode.UNDO ? "undone" : "redone")
+									: "only " + i + " could be " + (mode == Mode.UNDO ? "undone" : "redone") + ", so nothing was done")
+							+ ". Pass force=true to include the mapper's own edits.");
+				}
+				descriptions.add(desc);
 			}
 			if (mode == Mode.UNDO) {
 				h.undo(done);
@@ -103,6 +116,11 @@ public class UndoRedoTool extends BaseTool {
 		return JosmUtils.toJson(result);
 	}
 
+	/** Commands created by this plugin carry the "(MCP)" marker in their description. */
+	static boolean isOwn(String description) {
+		return description != null && description.contains(COMMAND_MARKER);
+	}
+
 	private static List<Map<String, Object>> describe(List<Command> stack, int limit) {
 		List<Map<String, Object>> out = new ArrayList<>();
 		for (int i = stack.size() - 1; i >= 0 && out.size() < limit; i--) {
@@ -111,6 +129,7 @@ public class UndoRedoTool extends BaseTool {
 			m.put("position", stack.size() - i);
 			m.put("description", c.getDescriptionText());
 			m.put("affected", c.getParticipatingPrimitives().size());
+			m.put("by_plugin", isOwn(c.getDescriptionText()));
 			out.add(m);
 		}
 		return out;

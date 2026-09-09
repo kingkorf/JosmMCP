@@ -68,7 +68,7 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 								+ "preferences (JosmMCP); '" + getName() + "' was not run."));
 					}
 					try {
-						if (isDestructive() && Prefs.confirmDestructive()) {
+						if (Prefs.confirmDestructive() && runInEDT(() -> requiresConfirmation(args))) {
 							boolean allowed = runInEDT(() -> ConfirmDialog.ask(getName(), describeForConfirmation(args)));
 							if (!allowed) {
 								AuditLog.record(getName(), args, "DENIED", "user denied or timeout");
@@ -93,6 +93,14 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 					}
 				});
 		return spec;
+	}
+
+	/**
+	 * Whether this call needs the mapper's confirmation (runs on the EDT, may inspect the dataset).
+	 * Destructive tools always do; other tools can ask for large or far-reaching changes.
+	 */
+	protected boolean requiresConfirmation(Map<String, Object> args) throws Exception {
+		return isDestructive();
 	}
 
 	/** Text shown in the confirmation dialog; tools may override with something friendlier than raw arguments. */
@@ -267,5 +275,18 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 			return defaultValue;
 		}
 		return Math.toIntExact(toLong(value, key));
+	}
+
+	/** Marker appended to every command description so undo/redo can tell the plugin's commands from the mapper's. */
+	public static final String COMMAND_MARKER = "(MCP)";
+
+	/**
+	 * Puts a command on JOSM's undo stack, wrapped so that its description ends with {@link #COMMAND_MARKER}.
+	 * Every tool must add its commands through this method; {@code undo}/{@code redo} refuse other commands.
+	 */
+	protected static void addCommand(org.openstreetmap.josm.command.Command c, String description) {
+		String d = description.endsWith(COMMAND_MARKER) ? description : description + " " + COMMAND_MARKER;
+		org.openstreetmap.josm.data.UndoRedoHandler.getInstance().add(
+				new org.openstreetmap.josm.command.SequenceCommand(d, java.util.Collections.singletonList(c), false));
 	}
 }

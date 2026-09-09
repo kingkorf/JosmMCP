@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,7 +26,6 @@ import java.util.Map;
 
 import org.openstreetmap.josm.command.Command;
 import org.openstreetmap.josm.command.DeleteCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
 import org.openstreetmap.josm.data.osm.Relation;
@@ -76,7 +77,7 @@ public class DeleteRelation extends BaseTool {
 		if (c == null) {
 			throw new Exception("Relation with id " + id + " could not be deleted");
 		}
-		UndoRedoHandler.getInstance().add(c);
+		addCommand(c, tr("Delete relation {0}", id));
 		return "Relation " + id + " deleted";
 	}
 

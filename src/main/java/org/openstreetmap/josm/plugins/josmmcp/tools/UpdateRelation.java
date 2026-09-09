@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.command.ChangeCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
@@ -118,7 +119,7 @@ public class UpdateRelation extends BaseTool {
 		}
 		Relation updated = new Relation(rel);
 		updated.setMembers(members);
-		UndoRedoHandler.getInstance().add(new ChangeCommand(rel, updated));
+		addCommand(new ChangeCommand(rel, updated), tr("Update members of relation {0}", rel.getUniqueId()));
 		return "Relation " + id + " now has " + members.size() + " members (was " + rel.getMembersCount() + ")";
 	}
 

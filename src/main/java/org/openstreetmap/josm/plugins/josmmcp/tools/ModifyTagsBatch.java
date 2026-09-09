@@ -29,7 +29,6 @@ import java.util.Map;
 import org.openstreetmap.josm.command.ChangePropertyCommand;
 import org.openstreetmap.josm.command.Command;
 import org.openstreetmap.josm.command.SequenceCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
@@ -73,6 +72,50 @@ public class ModifyTagsBatch extends BaseTool {
 	}
 
 
+	/** Above these sizes the mapper is asked first. */
+	static final int CONFIRM_ELEMENTS = 200;
+	static final int CONFIRM_RELATION_MEMBERS = 100;
+
+	@Override
+	protected boolean requiresConfirmation(Map<String, Object> args) throws Exception {
+		Object changesObj = args == null ? null : args.get("changes");
+		if (!(changesObj instanceof List)) {
+			return false;
+		}
+		List<?> changes = (List<?>) changesObj;
+		if (changes.size() > CONFIRM_ELEMENTS) {
+			return true;
+		}
+		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
+		if (ds == null) {
+			return false;
+		}
+		for (Object o : changes) {
+			if (o instanceof Map && "relation".equals(String.valueOf(((Map<?, ?>) o).get("element_type")))) {
+				try {
+					long id = toLong(((Map<?, ?>) o).get("element_id"), "element_id");
+					OsmPrimitive r = ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.RELATION));
+					if (r instanceof org.openstreetmap.josm.data.osm.Relation
+							&& ((org.openstreetmap.josm.data.osm.Relation) r).getMembersCount() > CONFIRM_RELATION_MEMBERS) {
+						return true;
+					}
+				} catch (Exception e) {
+					// invalid id: handle() will report it
+				}
+			}
+		}
+		return false;
+	}
+
+	@Override
+	protected String describeForConfirmation(Map<String, Object> args) {
+		Object changesObj = args == null ? null : args.get("changes");
+		int n = changesObj instanceof List ? ((List<?>) changesObj).size() : 0;
+		Object d = args == null ? null : args.get("description");
+		return "Change tags on " + n + " elements" + (d != null ? " (" + d + ")" : "")
+				+ "; the batch includes a large relation or more than " + CONFIRM_ELEMENTS + " elements";
+	}
+
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
 		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
@@ -111,7 +154,7 @@ public class ModifyTagsBatch extends BaseTool {
 		Object descObj = args.get("description");
 		String desc = descObj == null || descObj.toString().isBlank()
 				? tr("Modify tags of {0} elements (MCP)", elements) : descObj.toString() + " (MCP)";
-		UndoRedoHandler.getInstance().add(new SequenceCommand(desc, cmds, false));
+		addCommand(new SequenceCommand(desc, cmds, false), desc);
 
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("elements", elements);

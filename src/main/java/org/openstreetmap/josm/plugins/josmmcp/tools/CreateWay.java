@@ -17,6 +17,8 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.command.AddCommand;
-import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
@@ -89,7 +90,7 @@ public class CreateWay extends BaseTool {
 
 		AddCommand c = new AddCommand(ds, w);
 
-		UndoRedoHandler.getInstance().add(c);
+		addCommand(c, tr("Create way {0}", w.getUniqueId()));
 		return Long.toString(w.getUniqueId());
 	}
 
