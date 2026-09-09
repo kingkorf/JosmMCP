@@ -208,6 +208,6 @@ class ServerIntegrationTest {
 		assertEquals("{\"state\":true}", read.path("result").path("contents").get(0).path("text").asText());
 
 		JsonNode prompts = JSON.readTree(post(rpc("prompts/list", "{}"), Map.of()).body).path("result").path("prompts");
-		assertEquals(3, prompts.size());
+		assertEquals(4, prompts.size());
 	}
 }

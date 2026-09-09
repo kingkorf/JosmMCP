@@ -125,6 +125,18 @@ public final class McpServerRunner {
 								+ "unambiguous changes (start_date sync, finished constructions) and list everything else with the "
 								+ "evidence. Never delete existing objects without the mapper's explicit approval. Run validate before "
 								+ "reporting, and never upload."),
+				prompt("bus-stops-chb", "Check bus stops against the Dutch CHB stop register",
+						"Compare the bus stops in the loaded area with the Centraal Halte Bestand (CHB). Download the latest "
+								+ "ExportCHB_<date>.xml.gz from https://data.ndovloket.nl/haltes/ (about 14 MB gzipped, 350 MB XML). "
+								+ "The XML uses the namespace prefix ns1: on every element: stop places are <ns1:stopplace> with "
+								+ "<ns1:stopplacecode> (NL:S:...), <ns1:publicname>, <ns1:town>, <ns1:street>; each contains <ns1:quay> "
+								+ "elements with <ns1:quaycode> (NL:Q:..., the value of ref:IFOPT in OSM), <ns1:quaystatus>, "
+								+ "<ns1:compassdirection>, <ns1:shelter>, <ns1:bench>, and coordinates <ns1:rd-x>/<ns1:rd-y> in the "
+								+ "Dutch RD system (EPSG:28992), which must be converted to WGS84. Filter stop places by town, then match "
+								+ "each quay to an OSM node by ref:IFOPT and check name, position (a few metres is normal), shelter and "
+								+ "bench. Quays outside the loaded area may exist in OSM anyway: check with download_overpass "
+								+ "(node[\"ref:IFOPT\"=\"NL:Q:...\"]; out meta;) before adding anything. Platform ways without a name "
+								+ "and route relations are not stops and need no name or ref:IFOPT."),
 				prompt("surface-from-bgt", "Derive surface tags from the BGT",
 						"For highways without a surface tag, look up the BGT wegdeel polygons (fysiek voorkomen) under each way, "
 								+ "sample the way every few metres, and only tag ways where at least 60% of the samples agree and the "
