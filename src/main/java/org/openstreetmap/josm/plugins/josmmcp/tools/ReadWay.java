@@ -17,11 +17,15 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.data.osm.DataSet;
+import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
 import org.openstreetmap.josm.data.osm.SimplePrimitiveId;
 import org.openstreetmap.josm.data.osm.Way;
@@ -49,6 +53,8 @@ public class ReadWay extends BaseTool {
 		Map<String, Object> idProp = new HashMap<>();
 		idProp.put("type", "integer");
 		readProps.put("id", idProp);
+		readProps.put("include_nodes", Map.of("type", "boolean",
+				"description", "Also return the coordinates of every node as nodes: [{id, lat, lon}] (default false)"));
 		McpSchema.JsonSchema readSchema = new McpSchema.JsonSchema("object", readProps, Arrays.asList("id"), null, null,
 				null);
 		return readSchema;
@@ -67,6 +73,21 @@ public class ReadWay extends BaseTool {
 			throw new Exception("Way with id " + id + " not found");
 		}
 
+		if (Boolean.TRUE.equals(args.get("include_nodes"))) {
+			Map<String, Object> m = JosmUtils.toMap(w);
+			List<Map<String, Object>> nodes = new ArrayList<>();
+			for (Node n : w.getNodes()) {
+				Map<String, Object> nm = new LinkedHashMap<>();
+				nm.put("id", n.getUniqueId());
+				if (n.getCoor() != null) {
+					nm.put("lat", n.getCoor().lat());
+					nm.put("lon", n.getCoor().lon());
+				}
+				nodes.add(nm);
+			}
+			m.put("nodes", nodes);
+			return JosmUtils.toJson(m);
+		}
 		return JosmUtils.printElement(w);
 	}
 }

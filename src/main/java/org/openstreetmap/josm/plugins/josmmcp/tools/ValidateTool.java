@@ -77,6 +77,8 @@ public class ValidateTool extends BaseTool {
 				+ "in the validator preferences). Default false = the regular Validate action. Checks added by other "
 				+ "plugins through their own upload hooks (e.g. PT_Assistant) are not included.");
 		props.put("before_upload", upload);
+		props.put("fix", Map.of("type", "boolean",
+				"description", "Apply JOSM's automatic fix for every finding that offers one (default false). Each fix becomes an undo step."));
 		return new McpSchema.JsonSchema("object", props, null, null, null, null);
 	}
 
@@ -90,6 +92,10 @@ public class ValidateTool extends BaseTool {
 		String scope = scopeObj == null ? "changes" : scopeObj.toString();
 		boolean includeOther = args != null && Boolean.TRUE.equals(args.get("include_other"));
 		boolean beforeUpload = args != null && Boolean.TRUE.equals(args.get("before_upload"));
+		boolean fix = args != null && Boolean.TRUE.equals(args.get("fix"));
+		if (fix && org.openstreetmap.josm.plugins.josmmcp.Prefs.readOnly()) {
+			throw new Exception("fix=true modifies data and is disabled in read-only mode");
+		}
 
 		Collection<OsmPrimitive> targets = new ArrayList<>();
 		boolean partial = true;
@@ -156,6 +162,18 @@ public class ValidateTool extends BaseTool {
 			}
 		}
 
+		int nFixed = 0;
+		if (fix) {
+			for (TestError err : errors) {
+				if (!err.isIgnored() && err.isFixable()) {
+					org.openstreetmap.josm.command.Command c = err.getFix();
+					if (c != null) {
+						org.openstreetmap.josm.data.UndoRedoHandler.getInstance().add(c);
+						nFixed++;
+					}
+				}
+			}
+		}
 		int nErrors = 0;
 		int nWarnings = 0;
 		int nOther = 0;
@@ -200,6 +218,9 @@ public class ValidateTool extends BaseTool {
 		}
 
 		result.put("tests_run", tests.size());
+		if (fix) {
+			result.put("fixed", nFixed);
+		}
 		result.put("errors", nErrors);
 		result.put("warnings", nWarnings);
 		result.put("other", nOther);

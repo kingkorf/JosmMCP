@@ -21,10 +21,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.openstreetmap.josm.data.osm.BBox;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.search.SearchCompiler;
@@ -57,6 +60,11 @@ public class SearchTool extends BaseTool {
 		maxResultsProp.put("type", "integer");
 		maxResultsProp.put("description", "Maximum number of elements to return (default 50)");
 		searchProps.put("max_results", maxResultsProp);
+		searchProps.put("offset", Map.of("type", "integer", "description", "Skip this many matches first, for paging (default 0)"));
+		searchProps.put("bbox", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 4, "maxItems", 4,
+				"description", "Only elements intersecting [min_lon, min_lat, max_lon, max_lat]"));
+		searchProps.put("fields", Map.of("type", "array", "items", Map.of("type", "string"),
+				"description", "Only include these fields per element, e.g. [\"id\",\"type\",\"tags\"]; omit node_ids/members to keep results small"));
 		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, Arrays.asList("query"),
 				null, null, null);
 		return searchSchema;
@@ -75,26 +83,67 @@ public class SearchTool extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
-		SearchCompiler.Match matcher = SearchCompiler.compile(query);
-		Collection<OsmPrimitive> allPrimitives = ds.allPrimitives();
-		List<OsmPrimitive> results = new ArrayList<>();
+		int offset = getInt(args, "offset", 0);
+		if (offset < 0) {
+			throw new Exception("offset must not be negative");
+		}
+		Set<String> fields = null;
+		Object fieldsObj = args.get("fields");
+		if (fieldsObj instanceof List && !((List<?>) fieldsObj).isEmpty()) {
+			fields = new HashSet<>();
+			for (Object f : (List<?>) fieldsObj) {
+				fields.add(String.valueOf(f));
+			}
+			fields.add("id");
+			fields.add("type");
+		}
 
-		for (OsmPrimitive prim : allPrimitives) {
+		SearchCompiler.Match matcher = SearchCompiler.compile(query);
+		Collection<OsmPrimitive> candidates;
+		Object bboxObj = args.get("bbox");
+		if (bboxObj != null) {
+			if (!(bboxObj instanceof List) || ((List<?>) bboxObj).size() != 4) {
+				throw new Exception("bbox must be [min_lon, min_lat, max_lon, max_lat]");
+			}
+			List<?> b = (List<?>) bboxObj;
+			BBox bbox = new BBox(toDouble(b.get(0), "bbox"), toDouble(b.get(1), "bbox"), toDouble(b.get(2), "bbox"),
+					toDouble(b.get(3), "bbox"));
+			if (!bbox.isValid()) {
+				throw new Exception("bbox is not valid");
+			}
+			List<OsmPrimitive> c = new ArrayList<>();
+			c.addAll(ds.searchNodes(bbox));
+			c.addAll(ds.searchWays(bbox));
+			c.addAll(ds.searchRelations(bbox));
+			candidates = c;
+		} else {
+			candidates = ds.allPrimitives();
+		}
+		List<OsmPrimitive> results = new ArrayList<>();
+		for (OsmPrimitive prim : candidates) {
 			if (!prim.isDeleted() && !prim.isIncomplete() && matcher.match(prim)) {
 				results.add(prim);
 			}
 		}
 
 		List<Map<String, Object>> elements = new ArrayList<>();
-		for (int i = 0, limit = Math.min(results.size(), maxResults); i < limit; i++) {
-			elements.add(JosmUtils.toMap(results.get(i)));
+		for (int i = offset, limit = Math.min(results.size(), offset + maxResults); i < limit; i++) {
+			Map<String, Object> m = JosmUtils.toMap(results.get(i));
+			if (fields != null) {
+				m.keySet().retainAll(fields);
+			}
+			elements.add(m);
 		}
 
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("query", query);
+		if (bboxObj != null) {
+			result.put("bbox", bboxObj);
+		}
 		result.put("total_matches", results.size());
+		result.put("offset", offset);
 		result.put("returned", elements.size());
-		result.put("truncated", results.size() > elements.size());
+		result.put("truncated", offset + elements.size() < results.size());
 		result.put("elements", elements);
 		return JosmUtils.toJson(result);
 	}

@@ -97,16 +97,22 @@ public class StateTool extends BaseTool {
 			data.put("incomplete_stubs", incomplete);
 			data.put("selected", ds.getAllSelected().size());
 			data.put("modified", ds.isModified());
-			List<Map<String, Object>> bounds = new ArrayList<>();
-			for (Bounds b : ds.getDataSourceBounds()) {
-				Map<String, Object> bb = new LinkedHashMap<>();
-				bb.put("min_lat", b.getMinLat());
-				bb.put("min_lon", b.getMinLon());
-				bb.put("max_lat", b.getMaxLat());
-				bb.put("max_lon", b.getMaxLon());
-				bounds.add(bb);
+			List<Bounds> all = ds.getDataSourceBounds();
+			Map<String, Object> bounds = new LinkedHashMap<>();
+			bounds.put("count", all.size());
+			if (!all.isEmpty()) {
+				Bounds union = new Bounds(all.get(0));
+				for (Bounds b : all) {
+					union.extend(b);
+				}
+				Map<String, Object> u = new LinkedHashMap<>();
+				u.put("min_lat", union.getMinLat());
+				u.put("min_lon", union.getMinLon());
+				u.put("max_lat", union.getMaxLat());
+				u.put("max_lon", union.getMaxLon());
+				bounds.put("union", u);
 			}
-			data.put("bounds", bounds);
+			data.put("downloaded_bounds", bounds);
 			state.put("edit_dataset", data);
 		}
 
