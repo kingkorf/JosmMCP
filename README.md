@@ -48,7 +48,7 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 
 * `get_josm_state` – version, layers (with visibility), counts and downloaded bounds of the active layer
 * `get_user_selection` – the objects currently selected in JOSM
-* `search_elements` – JOSM search syntax, with `bbox`, `fields`, `offset` and `max_results`; runs off the UI thread under the dataset's read lock
+* `search_elements` – JOSM search syntax, with `bbox`, `polygon`, `center`/`radius_m`, `fields`, `offset` and `max_results`; runs off the UI thread under the dataset's read lock
 * `read_elements` – many objects in one call, optionally with node coordinates
 * `read_history` – version history of an object from the OSM server
 * `pending_changes_summary` – counts, tag keys, bbox and undo history of the pending changes, for drafting a changeset comment
@@ -61,7 +61,7 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 
 * `create_node`, `read_node`, `update_node` (move), `delete_node`
 * `create_way`, `read_way` (with `include_nodes`), `update_way_nodes`, `replace_geometry`, `delete_way`
-* `create_relation`, `read_relation`, `update_relation_members`, `delete_relation`
+* `create_relation`, `read_relation` (with `include_geometry`), `update_relation_members`, `delete_relation`
 
 `replace_geometry` gives an existing way a new outline while keeping its id, tags and history: untagged nodes used only by that way are moved or reused, nodes shared with other ways (fences, neighbours) or carrying tags are never moved, and surplus nodes are deleted. Delete tools remove the object from referencing ways and relations like JOSM's Delete does.
 
@@ -74,27 +74,30 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 
 * `download_area` – download a bbox from the OSM server into the active or a new layer (API limit of 0.25 square degrees enforced)
 * `download_incomplete` – complete relations or incomplete stubs
+* `download_overpass` – run an Overpass QL query through JOSM's downloader, e.g. to fetch objects outside the loaded area
 * `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue
 * `remove_layer` – remove a layer; data layers with unsaved changes are refused unless forced, the active data layer never
 
 **History and files**
 
-* `undo`, `redo`, `list_commands` – JOSM's undo/redo stack
+* `undo`, `redo`, `list_commands` – JOSM's undo/redo stack; undo and redo refuse the mapper's own commands unless `force=true`
 * `revert_to_server` – reload objects from the server, discarding local changes to them (File → Update selection)
 * `save_layer` – write the active layer to an .osm file, so pending edits survive a restart
 * `open_file` – open a local file as a new layer
+* `save_session`, `open_session` – save or restore all layers, imagery included, as a JOSM session (.joz)
+* `restart_josm` – restart JOSM, behind the confirmation dialog; combine with `save_session` when installing a new plugin jar
 
 ## Permissions, confirmation and audit
 
 Every tool belongs to a group: read, view, tags, geometry, delete, history, files, download. In the preferences each group can be switched off, independently of the global read-only mode. Groups map to the MCP annotations `readOnlyHint` and `destructiveHint`.
 
-By default JOSM shows a dialog before any delete or geometry replacement, naming the tool and the object, with Allow/Deny and a timeout (default 60 seconds, no answer means no). Denied calls return an error to the client and nothing changes.
+By default JOSM shows a dialog before any delete, geometry replacement, layer removal or restart, and before tag changes that touch a relation with more than 100 members or more than 200 elements at once, naming the tool and the object, with Allow/Deny and a timeout (default 60 seconds, no answer means no). Denied calls return an error to the client and nothing changes.
 
 Every modifying tool call is appended to `josmmcp-audit.log` in JOSM's user data directory: timestamp, tool, arguments, outcome. Both can be switched off in the preferences.
 
 ## Resources and prompts
 
-Resources `josm://state` and `josm://selection` expose the same JSON as the corresponding tools. Three prompts describe tested workflows: `review-area` (measure completeness and propose improvements), `bag-sync` (synchronise buildings with the Dutch BAG register) and `surface-from-bgt` (derive `surface` from the Dutch BGT).
+Resources `josm://state` and `josm://selection` expose the same JSON as the corresponding tools. Four prompts describe tested workflows: `review-area` (measure completeness and propose improvements), `bag-sync` (synchronise buildings with the Dutch BAG register), `surface-from-bgt` (derive `surface` from the Dutch BGT) and `bus-stops-chb` (check bus stops against the Dutch CHB register).
 
 ## Limitations
 
