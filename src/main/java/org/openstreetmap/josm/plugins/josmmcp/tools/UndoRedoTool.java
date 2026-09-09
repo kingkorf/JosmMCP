@@ -71,10 +71,6 @@ public class UndoRedoTool extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, null, null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return mode != Mode.LIST;
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -118,5 +114,15 @@ public class UndoRedoTool extends BaseTool {
 			out.add(m);
 		}
 		return out;
+	}
+
+	@Override
+	public Category category() {
+		return mode == Mode.LIST ? Category.READ : Category.HISTORY;
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
 	}
 }

@@ -232,4 +232,9 @@ public class ValidateTool extends BaseTool {
 		}
 		return JosmUtils.toJson(result);
 	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

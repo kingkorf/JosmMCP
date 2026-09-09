@@ -109,8 +109,9 @@ public class ModifyTags extends BaseTool {
 		return "Tags of " + type + " " + id + " updated";
 	}
 
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.TAGS;
 	}
 }

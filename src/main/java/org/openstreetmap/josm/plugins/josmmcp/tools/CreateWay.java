@@ -93,8 +93,9 @@ public class CreateWay extends BaseTool {
 		return Long.toString(w.getUniqueId());
 	}
 
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.GEOMETRY;
 	}
 }

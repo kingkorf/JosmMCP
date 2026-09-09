@@ -60,10 +60,6 @@ public class UpdateWayNodes extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, Arrays.asList("id", "node_ids"), null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return true;
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -92,5 +88,10 @@ public class UpdateWayNodes extends BaseTool {
 		int before = w.getNodesCount();
 		UndoRedoHandler.getInstance().add(new ChangeNodesCommand(ds, w, nodes));
 		return "Way " + id + " now has " + nodes.size() + " nodes (was " + before + ")";
+	}
+
+	@Override
+	public Category category() {
+		return Category.GEOMETRY;
 	}
 }

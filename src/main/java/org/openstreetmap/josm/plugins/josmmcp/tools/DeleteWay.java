@@ -81,13 +81,30 @@ public class DeleteWay extends BaseTool {
 		return "Way " + id + " deleted (including its untagged, otherwise unused nodes)";
 	}
 
+
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.DELETE;
 	}
 
 	@Override
-	public boolean isDestructive() {
-		return true;
+	protected String describeForConfirmation(Map<String, Object> args) {
+		try {
+			long id = getLong(args, "id");
+			org.openstreetmap.josm.data.osm.DataSet ds = MainApplication.getLayerManager().getEditDataSet();
+			org.openstreetmap.josm.data.osm.OsmPrimitive p = ds == null ? null
+					: ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.WAY));
+			if (p == null) {
+				return "Delete way " + id;
+			}
+			StringBuilder sb = new StringBuilder("Delete way " + id);
+			if (p.hasKeys()) {
+				sb.append(" with tags ").append(p.getKeys());
+			}
+			return sb.toString();
+		} catch (Exception e) {
+			return "Delete way " + args;
+		}
 	}
 }

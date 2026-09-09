@@ -97,4 +97,14 @@ public class OpenFile extends BaseTool {
 		result.put("layers", layers);
 		return Arrays.asList(new TextContent(JosmUtils.toJson(result)));
 	}
+
+	@Override
+	public Category category() {
+		return Category.FILES;
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

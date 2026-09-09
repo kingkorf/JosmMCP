@@ -22,6 +22,34 @@ import java.util.Map;
 import io.modelcontextprotocol.spec.McpSchema;
 
 public interface Tool {
+	/** What a tool does, used for per-group permissions and MCP annotations. */
+	enum Category {
+		/** Reads data or renders it; never changes anything. */
+		READ(false, "read"),
+		/** Changes what the user sees (selection, view, layer visibility) but not the data. */
+		VIEW(false, "view"),
+		/** Adds, changes or removes tags. */
+		TAGS(true, "tags"),
+		/** Creates objects or changes geometry and relation membership. */
+		GEOMETRY(true, "geometry"),
+		/** Deletes objects. */
+		DELETE(true, "delete"),
+		/** Undo, redo, revert. */
+		HISTORY(true, "history"),
+		/** Reads or writes local files. */
+		FILES(true, "files"),
+		/** Downloads data or adds layers. */
+		DOWNLOAD(true, "download");
+
+		public final boolean write;
+		public final String prefKey;
+
+		Category(boolean write, String prefKey) {
+			this.write = write;
+			this.prefKey = prefKey;
+		}
+	}
+
 	String getName();
 
 	String getDescription();
@@ -30,13 +58,22 @@ public interface Tool {
 
 	String handle(Map<String, Object> args) throws Exception;
 
-	/** True when the tool changes OSM data or files; such tools are blocked in read-only mode. */
-	default boolean isWriteTool() {
-		return false;
+	default Category category() {
+		return Category.READ;
 	}
 
-	/** True when the tool deletes data (reported to clients as destructiveHint). */
+	/** True when the tool changes OSM data or files; such tools are blocked in read-only mode. */
+	default boolean isWriteTool() {
+		return category().write;
+	}
+
+	/** True when the tool deletes data or discards geometry (reported as destructiveHint, asks for confirmation). */
 	default boolean isDestructive() {
+		return category() == Category.DELETE;
+	}
+
+	/** True when the tool's text result is a JSON object (enables outputSchema and structured content). */
+	default boolean returnsJson() {
 		return false;
 	}
 }

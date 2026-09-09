@@ -81,15 +81,7 @@ public class ReplaceGeometry extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, Arrays.asList("id", "coordinates"), null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return true;
-	}
 
-	@Override
-	public boolean isDestructive() {
-		return true; // surplus nodes are deleted
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -217,5 +209,28 @@ public class ReplaceGeometry extends BaseTool {
 		result.put("shared_or_tagged_nodes_kept", reusedFixed);
 		result.put("shared_or_tagged_nodes_left_out_of_way", droppedFixed);
 		return JosmUtils.toJson(result);
+	}
+
+	@Override
+	public Category category() {
+		return Category.GEOMETRY;
+	}
+
+	@Override
+	public boolean isDestructive() {
+		return true; // surplus nodes are deleted
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
+
+	@Override
+	protected String describeForConfirmation(Map<String, Object> args) {
+		Object coords = args == null ? null : args.get("coordinates");
+		int n = coords instanceof List ? ((List<?>) coords).size() : 0;
+		return "Replace the outline of way " + (args == null ? "?" : args.get("id")) + " with " + n
+				+ " new vertices (surplus untagged nodes of the way are deleted)";
 	}
 }

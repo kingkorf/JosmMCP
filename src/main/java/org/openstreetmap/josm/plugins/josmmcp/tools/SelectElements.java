@@ -92,4 +92,9 @@ public class SelectElements extends BaseTool {
 		}
 		return prims.isEmpty() ? "Selection cleared" : prims.size() + " object(s) selected" + (zoom ? " and zoomed to" : "");
 	}
+
+	@Override
+	public Category category() {
+		return Category.VIEW;
+	}
 }

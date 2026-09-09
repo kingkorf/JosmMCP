@@ -80,13 +80,30 @@ public class DeleteNode extends BaseTool {
 		return "Node " + id + " deleted";
 	}
 
+
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.DELETE;
 	}
 
 	@Override
-	public boolean isDestructive() {
-		return true;
+	protected String describeForConfirmation(Map<String, Object> args) {
+		try {
+			long id = getLong(args, "id");
+			org.openstreetmap.josm.data.osm.DataSet ds = MainApplication.getLayerManager().getEditDataSet();
+			org.openstreetmap.josm.data.osm.OsmPrimitive p = ds == null ? null
+					: ds.getPrimitiveById(new SimplePrimitiveId(id, OsmPrimitiveType.NODE));
+			if (p == null) {
+				return "Delete node " + id;
+			}
+			StringBuilder sb = new StringBuilder("Delete node " + id);
+			if (p.hasKeys()) {
+				sb.append(" with tags ").append(p.getKeys());
+			}
+			return sb.toString();
+		} catch (Exception e) {
+			return "Delete node " + args;
+		}
 	}
 }

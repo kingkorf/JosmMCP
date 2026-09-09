@@ -69,4 +69,9 @@ public class GetUserSelection extends BaseTool {
 		result.put("elements", elements);
 		return JosmUtils.toJson(result);
 	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

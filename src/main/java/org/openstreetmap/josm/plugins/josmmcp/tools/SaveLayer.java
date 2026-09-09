@@ -57,10 +57,6 @@ public class SaveLayer extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, null, null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return true;
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -96,5 +92,15 @@ public class SaveLayer extends BaseTool {
 		result.put("path", file.getAbsolutePath());
 		result.put("bytes", file.length());
 		return JosmUtils.toJson(result);
+	}
+
+	@Override
+	public Category category() {
+		return Category.FILES;
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
 	}
 }

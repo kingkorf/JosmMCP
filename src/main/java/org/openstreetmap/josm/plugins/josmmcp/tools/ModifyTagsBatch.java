@@ -72,10 +72,6 @@ public class ModifyTagsBatch extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, Arrays.asList("changes"), null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return true;
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -122,5 +118,15 @@ public class ModifyTagsBatch extends BaseTool {
 		result.put("tag_changes", tagOps);
 		result.put("undo_description", desc);
 		return JosmUtils.toJson(result);
+	}
+
+	@Override
+	public Category category() {
+		return Category.TAGS;
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
 	}
 }

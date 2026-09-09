@@ -69,4 +69,9 @@ public class ReadRelation extends BaseTool {
 
 		return JosmUtils.printElement(r);
 	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

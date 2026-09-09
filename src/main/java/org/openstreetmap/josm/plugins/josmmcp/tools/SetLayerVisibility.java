@@ -122,4 +122,14 @@ public class SetLayerVisibility extends BaseTool {
 		result.put("layers", out);
 		return JosmUtils.toJson(result);
 	}
+
+	@Override
+	public Category category() {
+		return Category.VIEW;
+	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

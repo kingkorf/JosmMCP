@@ -118,4 +118,9 @@ public class StateTool extends BaseTool {
 
 		return JosmUtils.toJson(state);
 	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

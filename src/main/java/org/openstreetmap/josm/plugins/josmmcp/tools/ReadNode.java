@@ -69,4 +69,9 @@ public class ReadNode extends BaseTool {
 
 		return JosmUtils.printElement(nd);
 	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

@@ -78,8 +78,9 @@ public class CreateNode extends BaseTool {
 		return Long.toString(nd.getUniqueId());
 	}
 
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.GEOMETRY;
 	}
 }

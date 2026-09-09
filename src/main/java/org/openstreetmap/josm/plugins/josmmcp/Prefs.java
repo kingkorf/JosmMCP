@@ -30,10 +30,16 @@ public final class Prefs {
 	public static final String TOKEN = "josmmcp.token";
 	public static final String READ_ONLY = "josmmcp.readonly";
 	public static final String MAX_OUTPUT_CHARS = "josmmcp.max_output_chars";
+	public static final String CONFIRM_DESTRUCTIVE = "josmmcp.confirm_destructive";
+	public static final String CONFIRM_TIMEOUT = "josmmcp.confirm_timeout_seconds";
+	public static final String AUDIT = "josmmcp.audit";
+	/** Prefix for per-category permissions, e.g. josmmcp.allow.delete */
+	public static final String ALLOW_PREFIX = "josmmcp.allow.";
 
 	public static final String DEFAULT_HOST = "127.0.0.1";
 	public static final int DEFAULT_PORT = 3000;
 	public static final int DEFAULT_MAX_OUTPUT_CHARS = 200_000;
+	public static final int DEFAULT_CONFIRM_TIMEOUT = 60;
 
 	private Prefs() {
 	}
@@ -53,6 +59,24 @@ public final class Prefs {
 
 	public static boolean readOnly() {
 		return Config.getPref().getBoolean(READ_ONLY, false);
+	}
+
+	public static boolean confirmDestructive() {
+		return Config.getPref().getBoolean(CONFIRM_DESTRUCTIVE, true);
+	}
+
+	public static int confirmTimeoutSeconds() {
+		int n = Config.getPref().getInt(CONFIRM_TIMEOUT, DEFAULT_CONFIRM_TIMEOUT);
+		return n < 5 ? 5 : n;
+	}
+
+	public static boolean audit() {
+		return Config.getPref().getBoolean(AUDIT, true);
+	}
+
+	/** Whether tools of the given category may run (all categories are allowed by default). */
+	public static boolean allowed(org.openstreetmap.josm.plugins.josmmcp.tools.Tool.Category category) {
+		return Config.getPref().getBoolean(ALLOW_PREFIX + category.prefKey, true);
 	}
 
 	public static int maxOutputChars() {

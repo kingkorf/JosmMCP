@@ -27,6 +27,8 @@ import java.util.concurrent.FutureTask;
 import javax.swing.SwingUtilities;
 
 import org.openstreetmap.josm.plugins.josmmcp.Prefs;
+import org.openstreetmap.josm.plugins.josmmcp.gui.ConfirmDialog;
+import org.openstreetmap.josm.plugins.josmmcp.server.AuditLog;
 import org.openstreetmap.josm.tools.Logging;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,29 +48,65 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 	public McpStatelessServerFeatures.AsyncToolSpecification getSpec() {
 		McpSchema.ToolAnnotations annotations = new McpSchema.ToolAnnotations(null, !isWriteTool(), isDestructive(),
 				null, false, null);
-		io.modelcontextprotocol.spec.McpSchema.Tool tool = Tool.builder().name(this.getName())
-				.description(this.getDescription()).inputSchema(this.getInputSchema()).annotations(annotations).build();
+		Tool.Builder builder = Tool.builder().name(this.getName()).description(this.getDescription())
+				.inputSchema(this.getInputSchema()).annotations(annotations);
+		if (returnsJson()) {
+			builder.outputSchema(Map.of("type", "object", "additionalProperties", true));
+		}
+		io.modelcontextprotocol.spec.McpSchema.Tool tool = builder.build();
 
 		McpStatelessServerFeatures.AsyncToolSpecification spec = new McpStatelessServerFeatures.AsyncToolSpecification(
 				tool, (exchange, params) -> {
-					Logging.info(String.format("Tool '%s' called with params: %s", this.getName(), params.arguments()));
+					Map<String, Object> args = params.arguments();
+					Logging.info(String.format("Tool '%s' called with params: %s", this.getName(), args));
 					if (isWriteTool() && Prefs.readOnly()) {
 						return Mono.just(error("JosmMCP is in read-only mode; '" + getName()
 								+ "' modifies data and is disabled. Change this in JOSM's preferences (JosmMCP)."));
 					}
+					if (!Prefs.allowed(category())) {
+						return Mono.just(error("Tools of the '" + category().prefKey + "' group are disabled in JOSM's "
+								+ "preferences (JosmMCP); '" + getName() + "' was not run."));
+					}
 					try {
-						Map<String, Object> args = params.arguments();
+						if (isDestructive() && Prefs.confirmDestructive()) {
+							boolean allowed = runInEDT(() -> ConfirmDialog.ask(getName(), describeForConfirmation(args)));
+							if (!allowed) {
+								AuditLog.record(getName(), args, "DENIED", "user denied or timeout");
+								return Mono.just(error("The mapper denied this '" + getName()
+										+ "' call in JOSM (or did not answer in time). Nothing was changed."));
+							}
+						}
 						List<Content> result = this.execute(args);
 						Logging.debug(String.format("Returning '%s' result: %s", this.getName(), result));
+						if (isWriteTool()) {
+							AuditLog.record(getName(), args, "OK", firstText(result));
+						}
 						return Mono.just(buildResult(result));
 					} catch (Exception e) {
 						String message = e.getMessage() != null ? e.getMessage() : e.toString();
 						Logging.error(String.format("Exception in '%s' - message: %s", this.getName(), message));
 						Logging.debug(e);
+						if (isWriteTool()) {
+							AuditLog.record(getName(), args, "ERROR", message);
+						}
 						return Mono.just(error(message));
 					}
 				});
 		return spec;
+	}
+
+	/** Text shown in the confirmation dialog; tools may override with something friendlier than raw arguments. */
+	protected String describeForConfirmation(Map<String, Object> args) {
+		return String.valueOf(args);
+	}
+
+	private static String firstText(List<Content> content) {
+		for (Content c : content) {
+			if (c instanceof TextContent) {
+				return ((TextContent) c).text();
+			}
+		}
+		return "";
 	}
 
 	private static CallToolResult error(String message) {

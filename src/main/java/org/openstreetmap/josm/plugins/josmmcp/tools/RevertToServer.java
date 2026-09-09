@@ -63,10 +63,6 @@ public class RevertToServer extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, Arrays.asList("elements"), null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return true;
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -96,5 +92,10 @@ public class RevertToServer extends BaseTool {
 		}
 		UpdateSelectionAction.updatePrimitives(prims);
 		return "Reload of " + prims.size() + " object(s) from the server started";
+	}
+
+	@Override
+	public Category category() {
+		return Category.HISTORY;
 	}
 }

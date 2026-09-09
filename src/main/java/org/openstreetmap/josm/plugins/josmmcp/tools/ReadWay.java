@@ -90,4 +90,9 @@ public class ReadWay extends BaseTool {
 		}
 		return JosmUtils.printElement(w);
 	}
+
+	@Override
+	public boolean returnsJson() {
+		return true;
+	}
 }

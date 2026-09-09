@@ -122,8 +122,9 @@ public class UpdateRelation extends BaseTool {
 		return "Relation " + id + " now has " + members.size() + " members (was " + rel.getMembersCount() + ")";
 	}
 
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.GEOMETRY;
 	}
 }

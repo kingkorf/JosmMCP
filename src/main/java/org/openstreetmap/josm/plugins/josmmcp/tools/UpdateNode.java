@@ -88,8 +88,9 @@ public class UpdateNode extends BaseTool {
 		return "Node " + id + " moved to " + ll;
 	}
 
+
 	@Override
-	public boolean isWriteTool() {
-		return true;
+	public Category category() {
+		return Category.GEOMETRY;
 	}
 }

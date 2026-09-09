@@ -63,10 +63,6 @@ public class CreateRelation extends BaseTool {
 		return new McpSchema.JsonSchema("object", props, Arrays.asList("tags", "members"), null, null, null);
 	}
 
-	@Override
-	public boolean isWriteTool() {
-		return true;
-	}
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
@@ -105,5 +101,10 @@ public class CreateRelation extends BaseTool {
 		r.setMembers(members);
 		UndoRedoHandler.getInstance().add(new AddCommand(ds, r));
 		return Long.toString(r.getUniqueId());
+	}
+
+	@Override
+	public Category category() {
+		return Category.GEOMETRY;
 	}
 }
