@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,9 +51,11 @@ public class SearchTool extends BaseTool {
 		Map<String, Object> searchProps = new HashMap<>();
 		Map<String, Object> queryProp = new HashMap<>();
 		queryProp.put("type", "string");
+		queryProp.put("description", "JOSM search expression, e.g. 'highway=residential' or 'amenity=restaurant name:pizza'");
 		searchProps.put("query", queryProp);
 		Map<String, Object> maxResultsProp = new HashMap<>();
 		maxResultsProp.put("type", "integer");
+		maxResultsProp.put("description", "Maximum number of elements to return (default 50)");
 		searchProps.put("max_results", maxResultsProp);
 		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, Arrays.asList("query"),
 				null, null, null);
@@ -61,10 +64,10 @@ public class SearchTool extends BaseTool {
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
-		String query = (String) args.get("query");
-		Integer maxResults = (Integer) args.get("max_results");
-		if (maxResults == null) {
-			maxResults = 50;
+		String query = requireArg(args, "query").toString();
+		int maxResults = getInt(args, "max_results", 50);
+		if (maxResults < 0) {
+			throw new Exception("max_results must not be negative");
 		}
 
 		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
@@ -77,21 +80,22 @@ public class SearchTool extends BaseTool {
 		List<OsmPrimitive> results = new ArrayList<>();
 
 		for (OsmPrimitive prim : allPrimitives) {
-			if (matcher.match(prim)) {
+			if (!prim.isDeleted() && !prim.isIncomplete() && matcher.match(prim)) {
 				results.add(prim);
 			}
 		}
 
-		StringBuilder sb = new StringBuilder("Search results for query '").append(query).append("': ")
-				.append(results.size());
-		if (results.size() > maxResults) {
-			sb.append(" (Showing first ").append(maxResults).append(")");
+		List<Map<String, Object>> elements = new ArrayList<>();
+		for (int i = 0, limit = Math.min(results.size(), maxResults); i < limit; i++) {
+			elements.add(JosmUtils.toMap(results.get(i)));
 		}
-		sb.append("\n");
 
-		for (int count = 0, limit = Math.min(results.size(), maxResults); count < limit; count++) {
-			sb.append("\n-----------------\n").append(JosmUtils.printElement(results.get(count)));
-		}
-		return sb.toString();
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("query", query);
+		result.put("total_matches", results.size());
+		result.put("returned", elements.size());
+		result.put("truncated", results.size() > elements.size());
+		result.put("elements", elements);
+		return JosmUtils.toJson(result);
 	}
 }

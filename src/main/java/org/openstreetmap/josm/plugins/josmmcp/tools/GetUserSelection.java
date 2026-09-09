@@ -17,8 +17,11 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.data.osm.DataSet;
@@ -57,10 +60,13 @@ public class GetUserSelection extends BaseTool {
 		}
 
 		Collection<OsmPrimitive> selection = ds.getAllSelected();
-		StringBuilder sb = new StringBuilder("Selected elements: " + selection.size());
+		List<Map<String, Object>> elements = new ArrayList<>();
 		for (OsmPrimitive prim : selection) {
-			sb.append("\n-----------------\n").append(JosmUtils.printElement(prim));
+			elements.add(JosmUtils.toMap(prim));
 		}
-		return sb.toString();
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("count", elements.size());
+		result.put("elements", elements);
+		return JosmUtils.toJson(result);
 	}
 }
