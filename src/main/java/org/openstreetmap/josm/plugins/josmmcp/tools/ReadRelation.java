@@ -17,8 +17,11 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.openstreetmap.josm.data.osm.DataSet;
@@ -49,6 +52,8 @@ public class ReadRelation extends BaseTool {
 		Map<String, Object> idProp = new HashMap<>();
 		idProp.put("type", "integer");
 		readProps.put("id", idProp);
+		readProps.put("include_geometry", Map.of("type", "boolean",
+				"description", "Add coordinates to the members: nodes get lat/lon, ways get nodes: [{id, lat, lon}] (default false)"));
 		McpSchema.JsonSchema readSchema = new McpSchema.JsonSchema("object", readProps, Arrays.asList("id"), null, null,
 				null);
 		return readSchema;
@@ -67,6 +72,43 @@ public class ReadRelation extends BaseTool {
 			throw new Exception("Relation with id " + id + " not found");
 		}
 
+		if (Boolean.TRUE.equals(args.get("include_geometry"))) {
+			Map<String, Object> m = JosmUtils.toMap(r);
+			List<Map<String, Object>> members = new ArrayList<>();
+			for (org.openstreetmap.josm.data.osm.RelationMember rm : r.getMembers()) {
+				Map<String, Object> mm = new LinkedHashMap<>();
+				mm.put("type", rm.getType().getAPIName());
+				mm.put("ref", rm.getUniqueId());
+				mm.put("role", rm.getRole());
+				if (rm.getMember().isIncomplete()) {
+					mm.put("incomplete", true);
+				} else if (rm.isNode() && rm.getNode().getCoor() != null) {
+					mm.put("lat", rm.getNode().getCoor().lat());
+					mm.put("lon", rm.getNode().getCoor().lon());
+					if (rm.getNode().hasKeys()) {
+						mm.put("tags", rm.getNode().getKeys());
+					}
+				} else if (rm.isWay()) {
+					List<Map<String, Object>> nodes = new ArrayList<>();
+					for (org.openstreetmap.josm.data.osm.Node n : rm.getWay().getNodes()) {
+						Map<String, Object> nm = new LinkedHashMap<>();
+						nm.put("id", n.getUniqueId());
+						if (n.getCoor() != null) {
+							nm.put("lat", n.getCoor().lat());
+							nm.put("lon", n.getCoor().lon());
+						}
+						nodes.add(nm);
+					}
+					mm.put("nodes", nodes);
+					if (rm.getWay().hasKeys()) {
+						mm.put("tags", rm.getWay().getKeys());
+					}
+				}
+				members.add(mm);
+			}
+			m.put("members", members);
+			return JosmUtils.toJson(m);
+		}
 		return JosmUtils.printElement(r);
 	}
 

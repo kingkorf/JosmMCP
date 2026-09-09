@@ -258,4 +258,48 @@ class EditToolsTest {
 		assertTrue(r.path("tag_keys_on_changed_objects").has("building"));
 		assertTrue(r.has("bbox"));
 	}
+
+	@Test
+	void undoRefusesForeignCommandsUnlessForced() throws Exception {
+		Way w = square();
+		// a command not made through the plugin: no "(MCP)" marker
+		UndoRedoHandler.getInstance().add(new org.openstreetmap.josm.command.ChangePropertyCommand(w, "foo", "bar"));
+		assertEquals("bar", w.get("foo"));
+		Exception e = org.junit.jupiter.api.Assertions.assertThrows(Exception.class,
+				() -> new UndoRedoTool(UndoRedoTool.Mode.UNDO).handle(args("n", 1)));
+		assertTrue(e.getMessage().contains("not made through this plugin"), e.getMessage());
+		assertEquals("bar", w.get("foo"), "nothing may be undone when refused");
+		new UndoRedoTool(UndoRedoTool.Mode.UNDO).handle(args("n", 1, "force", true));
+		assertNull(w.get("foo"));
+		JsonNode list = JSON.readTree(new UndoRedoTool(UndoRedoTool.Mode.LIST).handle(args("limit", 2)));
+		assertTrue(list.path("undo_stack").get(0).path("by_plugin").asBoolean());
+	}
+
+	@Test
+	void searchByPolygonAndRadius() throws Exception {
+		Way w = square(); // corners (5.0,52.0) .. (5.001,52.001)
+		new ModifyTags().handle(args("element_type", "way", "element_id", w.getUniqueId(), "tags", Map.of("building", "yes")));
+		JsonNode inside = JSON.readTree(new SearchTool().handle(args("query", "building=yes", "polygon",
+				Arrays.asList(Arrays.asList(4.999, 51.999), Arrays.asList(5.002, 51.999), Arrays.asList(5.002, 52.002), Arrays.asList(4.999, 52.002)))));
+		assertEquals(1, inside.path("total_matches").asInt());
+		JsonNode outside = JSON.readTree(new SearchTool().handle(args("query", "building=yes", "polygon",
+				Arrays.asList(Arrays.asList(5.01, 52.01), Arrays.asList(5.02, 52.01), Arrays.asList(5.02, 52.02)))));
+		assertEquals(0, outside.path("total_matches").asInt());
+		JsonNode near = JSON.readTree(new SearchTool().handle(args("query", "type:node", "center", Arrays.asList(5.0, 52.0), "radius_m", 10)));
+		assertEquals(1, near.path("total_matches").asInt(), "only the corner node at the centre is within 10 m");
+		JsonNode wide = JSON.readTree(new SearchTool().handle(args("query", "type:node", "center", Arrays.asList(5.0, 52.0), "radius_m", 200)));
+		assertEquals(4, wide.path("total_matches").asInt());
+	}
+
+	@Test
+	void readRelationWithGeometry() throws Exception {
+		Way w = square();
+		long rid = Long.parseLong(new CreateRelation().handle(args("tags", Map.of("type", "multipolygon"),
+				"members", Arrays.asList(Map.of("type", "way", "ref", w.getUniqueId(), "role", "outer"),
+						Map.of("type", "node", "ref", w.getNode(0).getUniqueId(), "role", "label")))));
+		JsonNode r = JSON.readTree(new ReadRelation().handle(args("id", rid, "include_geometry", true)));
+		assertEquals(2, r.path("members").size());
+		assertEquals(5, r.path("members").get(0).path("nodes").size());
+		assertTrue(r.path("members").get(1).has("lat"));
+	}
 }
