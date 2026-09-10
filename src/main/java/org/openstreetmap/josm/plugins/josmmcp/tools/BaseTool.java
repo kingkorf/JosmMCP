@@ -285,6 +285,12 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 	 * Every tool must add its commands through this method; {@code undo}/{@code redo} refuse other commands.
 	 */
 	protected static void addCommand(org.openstreetmap.josm.command.Command c, String description) {
+		String own = c.getDescriptionText();
+		if (c instanceof org.openstreetmap.josm.command.SequenceCommand && own != null && own.contains(COMMAND_MARKER)) {
+			// already a marked sequence (modify_tags, replace_geometry, ...): do not wrap it a second time
+			org.openstreetmap.josm.data.UndoRedoHandler.getInstance().add(c);
+			return;
+		}
 		String d = description.endsWith(COMMAND_MARKER) ? description : description + " " + COMMAND_MARKER;
 		org.openstreetmap.josm.data.UndoRedoHandler.getInstance().add(
 				new org.openstreetmap.josm.command.SequenceCommand(d, java.util.Collections.singletonList(c), false));

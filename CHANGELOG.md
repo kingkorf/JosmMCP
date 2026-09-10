@@ -4,6 +4,9 @@ All notable changes to JosmMCP. The format follows [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+### Fixed
+- Undo descriptions of `modify_tags`, `modify_tags_batch` and `replace_geometry` were wrapped twice ("Sequence: Sequence: ...").
+
 ## [0.3.0] - 2026-09-10
 
 ### Added
