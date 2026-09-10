@@ -53,7 +53,11 @@ public class FindDuplicateNodes extends BaseTool {
 	public String getDescription() {
 		return "Find groups of nodes at the same position (or within tolerance_m of each other) in a bbox or the whole "
 				+ "layer, including nodes that were not modified, so unglued outlines can be found and passed to "
-				+ "merge_nodes. Each group lists the nodes with their tags and parent ways, and says whether merging "
+				+ "merge_nodes. Each group lists the nodes with their tags and parent ways - each parent with its own "
+				+ "tags, because whether a group should be merged depends on what the ways are: two landuse parcels "
+				+ "meeting at a corner want a shared node, a river and an administrative boundary that touch do not. "
+				+ "'mergeable' only means merging would raise no tag or relation conflict, not that it is correct. "
+				+ "The result says whether merging "
 				+ "would conflict (different tag values, or several nodes in relations).";
 	}
 
@@ -207,11 +211,18 @@ public class FindDuplicateNodes extends BaseTool {
 				if (n.isTagged()) {
 					nm.put("tags", n.getKeys());
 				}
-				List<Long> ways = new ArrayList<>();
+				// Parent ways come with their tags: a caller cannot judge whether a group should be
+				// merged from ids alone, and fetching them separately is a round trip per group.
+				List<Map<String, Object>> ways = new ArrayList<>();
 				int relations = 0;
 				for (OsmPrimitive p : n.getReferrers()) {
 					if (p instanceof Way) {
-						ways.add(p.getUniqueId());
+						Map<String, Object> wm = new LinkedHashMap<>();
+						wm.put("id", p.getUniqueId());
+						if (p.isTagged()) {
+							wm.put("tags", p.getKeys());
+						}
+						ways.add(wm);
 					} else {
 						relations++;
 					}
