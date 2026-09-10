@@ -48,7 +48,7 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 
 **Inspect**
 
-* `get_josm_state` – version, layers (with visibility), counts and downloaded bounds of the active layer
+* `get_josm_state` – version, interface `locale`, layers (with visibility), counts and downloaded bounds of the active layer
 * `get_user_selection` – the objects currently selected in JOSM
 * `search_elements` – JOSM search syntax, with `bbox`, `polygon`, `center`/`radius_m`, `fields`, `offset` and `max_results`; `ids` restricts to given element ids (query then optional), so "which of these lie in this area" is one call; runs off the UI thread under the dataset's read lock
 * `read_elements` – many objects in one call, optionally with node coordinates
@@ -61,7 +61,7 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 * `search_elements` – JOSM search expressions with `bbox`, `polygon`, `center`+`radius_m`, `ids`, `fields`, `offset`/`max_results`. `key=value` is an exact, case sensitive match without wildcards, so `regex=true` reads the values as regular expressions that must match the whole value (`"source:date"=2014.*`); `case_sensitive` then decides whether that regex ignores case. `include_geometry` adds `nodes: [{id, lat, lon}]` to every way in the result, so outlines can be compared with an external source without reading each way separately
 * `find_orphan_nodes` – untagged nodes used by no way or relation (by default only new or modified ones), ready for `delete_elements`
 * `find_duplicate_nodes` – groups of nodes at the same position (or within `tolerance_m`) in a bbox or the whole layer, with tags, parent ways and whether merging would conflict
-* `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection, the whole layer, a `bbox` or a list of `elements`; `tests` restricts to tests whose name contains a string, `max_findings` caps the list (the summary always covers all); `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes and reports as `fix_unavailable` the findings that call themselves fixable but only offer their fix through a dialog
+* `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection, the whole layer, a `bbox` or a list of `elements`; `tests` restricts to tests whose name contains a string, `max_findings` caps the list (the summary always covers all); `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes and reports as `fix_unavailable` the findings that call themselves fixable but only offer their fix through a dialog. Every finding carries `test_class` and `code` next to the translated `test` and `message`, so a client can recognise a finding whatever language JOSM runs in
 
 **Nodes, ways, relations**
 
@@ -94,7 +94,7 @@ Each batch is a single undo step and is applied completely or not at all.
 * `download_area` – download a bbox from the OSM server into the active or a new layer (API limit of 0.25 square degrees enforced)
 * `download_incomplete` – complete relations or incomplete stubs
 * `download_overpass` – run an Overpass QL query through JOSM's downloader, e.g. to fetch objects outside the loaded area
-* `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue
+* `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue. Catalogue names are translated into JOSM's interface language, ids are not, so both are searched and `list_imagery` also takes a `country` filter: "NRW" finds "Noordrijn-Westfalen luchtfoto's" through its id `DE-NRW-DOP`
 * `remove_layer` – remove a layer; data layers with unsaved changes are refused unless forced, the active data layer never
 
 **History and files**

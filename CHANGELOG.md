@@ -2,6 +2,17 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-09-10
+
+### Fixed
+- `list_imagery` searched only an entry's name, and catalogue names are translated into JOSM's interface language. On a Dutch JOSM a search for "NRW" returned nothing while the layer sat there as "Noordrijn-Westfalen luchtfoto's"; the query now matches the untranslated id as well, and `add_imagery_layer` accepts an exact id.
+
+### Added
+- `list_imagery`: a `country` filter taking an ISO 3166-1 alpha-2 code, so another country's layers can be found without guessing their translated name.
+- `validate`: every finding carries `test_class` (the validator test's class name) and `code` beside the already present `test` and `message`. Those two are not translated, so a client can recognise a finding whatever language JOSM runs in; the message strings cannot be relied on for that. All MapCSS-based tag checks share the class `MapCSSTagChecker`.
+- `get_josm_state`: reports JOSM's interface `locale`, so a client knows up front that validator messages, imagery names and preset names come back translated.
+- `docs/agent-guide/german-sources.md`: a second worked example of verifying against a national register, for the NRW ALKIS WFS, including the trap that `ave:GebaeudeBauwerk` counts canopies and building parts as well as buildings.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added
