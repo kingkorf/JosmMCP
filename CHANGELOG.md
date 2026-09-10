@@ -2,9 +2,20 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] - 2026-09-10
+
+### Added
+- `validate`: scopes `bbox` and `elements`, a `tests` name filter and `max_findings`.
+- `search_elements`: `ids` parameter (query optional), combinable with the spatial filters.
+- `find_orphan_nodes`: untagged nodes without parents, for cleaning up after geometry edits.
+- `reshape_area`: move buildings out of or into a landuse-like area by redrawing its outline (and the neighbours' outlines) around them, with protection of other buildings and areas and a dry run.
+- `find_duplicate_nodes` and `merge_nodes`: find nodes on the same spot across the whole layer and merge them in batches without dialogs; conflicting groups are reported.
+- `replace_geometry`: `snap_m` and `glue_m` parameters; a vertex coinciding with a node of another way reuses that node (gluing to neighbours), shared nodes lying on a new segment are inserted into it, each shared node is used at most once so no node repeats, dropped shared nodes are reported by id, and moved nodes get exact coordinates.
+- `create_nodes`, `update_nodes`, `delete_elements`: batch versions of the node and delete tools; one undo step, one confirmation, all or nothing.
+- `output_path` on `search_elements`, `read_elements` and `validate`: write the full result to a file and return only a compact summary.
 
 ### Fixed
+- `update_node` (and the new `update_nodes`) set the exact lat/lon; the former MoveCommand went through the projection and left floating point noise in the coordinates, which defeats duplicate-node detection.
 - Undo descriptions of `modify_tags`, `modify_tags_batch` and `replace_geometry` were wrapped twice ("Sequence: Sequence: ...").
 
 ## [0.3.0] - 2026-09-10

@@ -44,26 +44,40 @@ With an access token configured, add `--header "Authorization: Bearer <token>"`.
 
 Read tools return JSON, also as MCP structured content with an output schema. Every edit is one or more JOSM undo steps.
 
+`search_elements`, `read_elements`, `find_duplicate_nodes`, `find_orphan_nodes` and `validate` accept `output_path`: the full result is written to that `.json` or `.txt` file and only a compact summary (scalars, array lengths) is returned, so large results can be processed by a script instead of passing through the model. Writing needs the `files` tool group.
+
 **Inspect**
 
 * `get_josm_state` – version, layers (with visibility), counts and downloaded bounds of the active layer
 * `get_user_selection` – the objects currently selected in JOSM
-* `search_elements` – JOSM search syntax, with `bbox`, `polygon`, `center`/`radius_m`, `fields`, `offset` and `max_results`; runs off the UI thread under the dataset's read lock
+* `search_elements` – JOSM search syntax, with `bbox`, `polygon`, `center`/`radius_m`, `fields`, `offset` and `max_results`; `ids` restricts to given element ids (query then optional), so "which of these lie in this area" is one call; runs off the UI thread under the dataset's read lock
 * `read_elements` – many objects in one call, optionally with node coordinates
 * `read_history` – version history of an object from the OSM server
 * `pending_changes_summary` – counts, tag keys, bbox and undo history of the pending changes, for drafting a changeset comment
 * `select_elements` – select objects in JOSM (optionally zoom to them) so the mapper sees them
 * `capture_map_view` – render the map view (data plus imagery) to an image, optionally zooming to an element or bbox first and restoring the view afterwards
 * `set_layer_visibility` – show/hide a layer or set its opacity
-* `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection or the whole layer; `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes
+* `find_orphan_nodes` – untagged nodes used by no way or relation (by default only new or modified ones), ready for `delete_elements`
+* `find_duplicate_nodes` – groups of nodes at the same position (or within `tolerance_m`) in a bbox or the whole layer, with tags, parent ways and whether merging would conflict
+* `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection, the whole layer, a `bbox` or a list of `elements`; `tests` restricts to tests whose name contains a string, `max_findings` caps the list (the summary always covers all); `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes
 
 **Nodes, ways, relations**
 
 * `create_node`, `read_node`, `update_node` (move), `delete_node`
 * `create_way`, `read_way` (with `include_nodes`), `update_way_nodes`, `replace_geometry`, `delete_way`
 * `create_relation`, `read_relation` (with `include_geometry`), `update_relation_members`, `delete_relation`
+* `reshape_area` – redraw a landuse-like area so that given buildings lie outside (`exclude`) or inside (`include`) it, with `offset_m` of room; the ground moves to or from the neighbouring areas so the tiling stays gap- and overlap-free, other buildings and areas are protected, `dry_run` previews
 
-`replace_geometry` gives an existing way a new outline while keeping its id, tags and history: untagged nodes used only by that way are moved or reused, nodes shared with other ways (fences, neighbours) or carrying tags are never moved, and surplus nodes are deleted. Delete tools remove the object from referencing ways and relations like JOSM's Delete does.
+**Batches**
+
+* `create_nodes` – many untagged nodes from `[lon, lat]` pairs, ids back in the same order
+* `update_nodes` – move many nodes
+* `delete_elements` – delete many objects of any type; one undo step and one confirmation dialog
+* `merge_nodes` – merge groups of nodes into one node each, like JOSM's Merge Nodes, without dialogs: groups with tag or relation conflicts are refused or skipped
+
+Each batch is a single undo step and is applied completely or not at all.
+
+`replace_geometry` gives an existing way a new outline while keeping its id, tags and history. Nodes shared with other ways (fences, neighbours) or carrying tags are never moved: one within `snap_m` (default 0.5 m) of a new vertex takes that vertex, one lying on a new segment within `glue_m` (default 2 cm) is inserted into it so the connection to the neighbour survives, and the rest drop out of the way and are reported by id. A vertex that coincides with a node of another way (within `glue_m`) reuses that node, so a landuse outline drawn along a building glues to the building instead of getting a duplicate node on top of it. Untagged nodes used only by the way are moved to the remaining vertices (exact coordinates) or deleted when surplus; the result never repeats a node. Delete tools remove the object from referencing ways and relations like JOSM's Delete does.
 
 **Tags**
 
