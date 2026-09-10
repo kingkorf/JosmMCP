@@ -36,5 +36,6 @@ if __name__ == "__main__":
     want = to_skill(GUIDE.read_text())
     if "--check" in sys.argv:
         sys.exit(0 if SKILL.read_text() == want else "SKILL.md is out of sync with the guide")
+    SKILL.parent.mkdir(parents=True, exist_ok=True)
     SKILL.write_text(want)
     print(f"wrote {SKILL} ({len(want)} chars)")
