@@ -45,11 +45,41 @@ import reactor.core.publisher.Mono;
 public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp.tools.Tool {
 	private static final ObjectMapper JSON = new ObjectMapper();
 
+	/** Name of the optional argument that sends a tool's result to a file instead of the conversation. */
+	public static final String OUTPUT_PATH = "output_path";
+
+	/**
+	 * Whether this tool accepts {@link #OUTPUT_PATH}. Read tools with potentially large JSON results
+	 * (search, read_elements, validate) return true; the result is then written to that file and only a
+	 * compact summary comes back, so a script can process the data without it passing through the model.
+	 */
+	protected boolean supportsOutputPath() {
+		return false;
+	}
+
+	/** The declared input schema, extended with {@link #OUTPUT_PATH} when the tool supports it. */
+	public McpSchema.JsonSchema getEffectiveInputSchema() {
+		McpSchema.JsonSchema schema = getInputSchema();
+		if (!supportsOutputPath() || schema == null) {
+			return schema;
+		}
+		Map<String, Object> props = new java.util.LinkedHashMap<>();
+		if (schema.properties() != null) {
+			props.putAll(schema.properties());
+		}
+		props.put(OUTPUT_PATH, Map.of("type", "string", "description",
+				"Absolute path of a .json or .txt file to write the full result to. Only a compact summary is returned "
+						+ "(scalars kept, arrays replaced by their length); use this for large results that a script "
+						+ "will process. Needs the 'files' tool group to be enabled."));
+		return new McpSchema.JsonSchema(schema.type(), props, schema.required(), schema.additionalProperties(),
+				schema.defs(), schema.definitions());
+	}
+
 	public McpStatelessServerFeatures.AsyncToolSpecification getSpec() {
 		McpSchema.ToolAnnotations annotations = new McpSchema.ToolAnnotations(null, !isWriteTool(), isDestructive(),
 				null, false, null);
 		Tool.Builder builder = Tool.builder().name(this.getName()).description(this.getDescription())
-				.inputSchema(this.getInputSchema()).annotations(annotations);
+				.inputSchema(this.getEffectiveInputSchema()).annotations(annotations);
 		if (returnsJson()) {
 			builder.outputSchema(Map.of("type", "object", "additionalProperties", true));
 		}
@@ -76,7 +106,16 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 										+ "' call in JOSM (or did not answer in time). Nothing was changed."));
 							}
 						}
+						Object outputPath = args == null ? null : args.get(OUTPUT_PATH);
+						if (outputPath != null && supportsOutputPath() && !Prefs.allowed(Category.FILES)) {
+							return Mono.just(error("'" + OUTPUT_PATH + "' writes a file, which needs the 'files' tool group; "
+									+ "it is disabled in JOSM's preferences (JosmMCP). Call '" + getName()
+									+ "' without " + OUTPUT_PATH + " instead."));
+						}
 						List<Content> result = this.execute(args);
+						if (outputPath != null && supportsOutputPath()) {
+							result = Arrays.asList(new TextContent(writeOutput(firstText(result), outputPath.toString())));
+						}
 						Logging.debug(String.format("Returning '%s' result: %s", this.getName(), result));
 						if (isWriteTool()) {
 							AuditLog.record(getName(), args, "OK", firstText(result));
@@ -106,6 +145,57 @@ public abstract class BaseTool implements org.openstreetmap.josm.plugins.josmmcp
 	/** Text shown in the confirmation dialog; tools may override with something friendlier than raw arguments. */
 	protected String describeForConfirmation(Map<String, Object> args) {
 		return String.valueOf(args);
+	}
+
+	/**
+	 * Writes a tool's text result to {@code path} and returns a compact JSON summary: the file, its size and,
+	 * for a JSON object result, its scalar fields plus the lengths of its arrays and the key counts of large
+	 * nested objects. Small nested objects (such as validate's per-message summary) are kept.
+	 */
+	static String writeOutput(String text, String path) throws Exception {
+		java.io.File file = new java.io.File(path);
+		if (!file.isAbsolute()) {
+			throw new Exception(OUTPUT_PATH + " must be absolute");
+		}
+		String lower = file.getName().toLowerCase(java.util.Locale.ROOT);
+		if (!lower.endsWith(".json") && !lower.endsWith(".txt")) {
+			throw new Exception(OUTPUT_PATH + " must end in .json or .txt");
+		}
+		java.io.File parent = file.getAbsoluteFile().getParentFile();
+		if (parent == null || !parent.isDirectory()) {
+			throw new Exception("directory does not exist: " + parent);
+		}
+		if (file.exists() && !file.isFile()) {
+			throw new Exception(OUTPUT_PATH + " is not a regular file: " + file);
+		}
+		byte[] bytes = (text == null ? "" : text).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+		java.nio.file.Files.write(file.toPath(), bytes);
+
+		Map<String, Object> summary = new java.util.LinkedHashMap<>();
+		summary.put(OUTPUT_PATH, file.getAbsolutePath());
+		summary.put("bytes", bytes.length);
+		if (text != null && text.startsWith("{")) {
+			try {
+				Map<String, Object> parsed = JSON.readValue(text, new TypeReference<Map<String, Object>>() {
+				});
+				Map<String, Object> compact = new java.util.LinkedHashMap<>();
+				for (Map.Entry<String, Object> e : parsed.entrySet()) {
+					Object v = e.getValue();
+					if (v instanceof List && (((List<?>) v).size() > 8
+							|| ((List<?>) v).stream().anyMatch(x -> x instanceof Map || x instanceof List))) {
+						compact.put(e.getKey(), ((List<?>) v).size() + " items in file");
+					} else if (v instanceof Map && ((Map<?, ?>) v).size() > 50) {
+						compact.put(e.getKey(), ((Map<?, ?>) v).size() + " keys in file");
+					} else {
+						compact.put(e.getKey(), v);
+					}
+				}
+				summary.put("result", compact);
+			} catch (Exception e) {
+				// not a JSON object: only the file reference is returned
+			}
+		}
+		return JSON.writeValueAsString(summary);
 	}
 
 	private static String firstText(List<Content> content) {

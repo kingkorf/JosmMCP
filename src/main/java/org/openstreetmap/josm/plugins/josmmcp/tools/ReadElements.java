@@ -71,6 +71,11 @@ public class ReadElements extends BaseTool {
 	}
 
 	@Override
+	protected boolean supportsOutputPath() {
+		return true;
+	}
+
+	@Override
 	public String handle(Map<String, Object> args) throws Exception {
 		DataSet ds = MainApplication.getLayerManager().getEditDataSet();
 		if (ds == null) {
