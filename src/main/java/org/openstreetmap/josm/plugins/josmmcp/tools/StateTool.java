@@ -56,6 +56,8 @@ public class StateTool extends BaseTool {
 	public String handle(Map<String, Object> args) throws Exception {
 		Map<String, Object> state = new LinkedHashMap<>();
 		state.put("josm_version", Version.getInstance().getVersionString());
+		// Validator messages, imagery names and preset names come back in this language.
+		state.put("locale", java.util.Locale.getDefault().toLanguageTag());
 
 		OsmDataLayer editLayer = MainApplication.getLayerManager().getEditLayer();
 		List<Map<String, Object>> layers = new ArrayList<>();

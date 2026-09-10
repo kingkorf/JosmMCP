@@ -301,7 +301,12 @@ public class ValidateTool extends BaseTool {
 			}
 			Map<String, Object> f = new LinkedHashMap<>();
 			f.put("severity", sev.toString().toLowerCase(java.util.Locale.ROOT));
+			// getName() and getMessage() are translated into JOSM's interface language. The test's
+			// class name and the error code are not, so they are the stable handle for a client that
+			// has to recognise a finding regardless of locale.
 			f.put("test", err.getTester() == null ? null : err.getTester().getName());
+			f.put("test_class", err.getTester() == null ? null : err.getTester().getClass().getSimpleName());
+			f.put("code", err.getCode());
 			f.put("message", err.getMessage());
 			if (err.getDescription() != null && !err.getDescription().isEmpty()) {
 				f.put("description", err.getDescription());
