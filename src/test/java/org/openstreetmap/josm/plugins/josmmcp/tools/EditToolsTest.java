@@ -1102,4 +1102,84 @@ class EditToolsTest {
 		}
 	}
 
+
+	@Test
+	void listImageryFiltersByCoverage() throws Exception {
+		// Belgium publishes imagery per region, so a country filter is too coarse: this is what
+		// "covering" is for.
+		ImageryInfo flanders = new ImageryInfo("Digitaal Vlaanderen 2024 luchtfoto's");
+		flanders.setId("OrthoVlaanderen2024");
+		flanders.setCountryCode("BE");
+		flanders.setBounds(new ImageryInfo.ImageryBounds("50.68,2.54,51.51,5.91", ","));
+		ImageryInfo wallonia = new ImageryInfo("SPW(allonie) meest recente luchtfoto's");
+		wallonia.setId("SPWLAST");
+		wallonia.setCountryCode("BE");
+		wallonia.setBounds(new ImageryInfo.ImageryBounds("49.49,2.84,50.82,6.41", ","));
+		ImageryInfo world = new ImageryInfo("Esri World Imagery");
+		world.setId("EsriWorldImagery");
+		ImageryLayerInfo.instance.add(flanders);
+		ImageryLayerInfo.instance.add(wallonia);
+		ImageryLayerInfo.instance.add(world);
+		try {
+			// the country filter returns both Belgian layers, which is the problem
+			assertEquals(2, JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "", "country", "BE"))).path("total_matches").asInt());
+
+			// Gives, in the Ardennes: Wallonia and the worldwide entry, not Flanders
+			JsonNode there = JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "", "covering", Arrays.asList(5.62, 50.08))));
+			assertTrue(there.path("covering").asBoolean());
+			List<String> ids = new ArrayList<>();
+			for (JsonNode e : there.path("entries")) {
+				ids.add(e.path("id").asText());
+			}
+			assertTrue(ids.contains("SPWLAST"), "Wallonia covers Gives");
+			assertTrue(ids.contains("EsriWorldImagery"), "an entry without bounds is worldwide");
+			assertFalse(ids.contains("OrthoVlaanderen2024"), "Flanders does not cover Gives");
+
+			// a box works too, and Ghent picks the other region
+			JsonNode ghent = JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "", "covering", Arrays.asList(3.70, 51.04, 3.74, 51.06))));
+			List<String> gids = new ArrayList<>();
+			for (JsonNode e : ghent.path("entries")) {
+				gids.add(e.path("id").asText());
+			}
+			assertTrue(gids.contains("OrthoVlaanderen2024"));
+			assertFalse(gids.contains("SPWLAST"));
+
+			assertThrows(Exception.class, () -> new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "", "covering", Arrays.asList(1.0, 2.0, 3.0))));
+		} finally {
+			ImageryLayerInfo.instance.clear();
+		}
+	}
+
+	@Test
+	void duplicateNodeGroupsCarryTheirParentWaysTags() throws Exception {
+		Way w = square();
+		new ModifyTags().handle(args("element_type", "way", "element_id", w.getUniqueId(),
+				"tags", Map.of("waterway", "river")));
+		// a second, separate way with a node on the exact same spot
+		Node n = w.getNode(0);
+		long other = Long.parseLong(new CreateNode().handle(args("latitude", n.lat(), "longitude", n.lon())));
+		long far = Long.parseLong(new CreateNode().handle(args("latitude", 52.01, "longitude", 5.01)));
+        long wid = Long.parseLong(new CreateWay().handle(args("node_ids", Arrays.asList(other, far))));
+		new ModifyTags().handle(args("element_type", "way", "element_id", wid,
+				"tags", Map.of("boundary", "administrative", "admin_level", "7")));
+
+		JsonNode r = JSON.readTree(new FindDuplicateNodes().handle(args()));
+		JsonNode group = null;
+		for (JsonNode g : r.path("groups")) {
+			if (g.path("nodes").size() >= 2) {
+				group = g;
+			}
+		}
+		assertNotNull(group, "expected a duplicate group");
+		// the tags that decide whether merging is right must be in the same result
+		String all = group.toString();
+		assertTrue(all.contains("waterway"), "the river's tags should be in the group");
+		assertTrue(all.contains("boundary"), "the boundary's tags should be in the group");
+		assertTrue(group.path("mergeable").asBoolean(), "no tag conflict, which is not the same as correct");
+	}
+
 }

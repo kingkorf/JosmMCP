@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.openstreetmap.josm.data.Bounds;
 import org.openstreetmap.josm.data.imagery.ImageryInfo;
 import org.openstreetmap.josm.data.imagery.ImageryLayerInfo;
 import org.openstreetmap.josm.gui.MainApplication;
@@ -65,7 +66,9 @@ public class ImageryTools extends BaseTool {
 				+ "The query matches the entry's name and its id, and 'country' filters by ISO country code. "
 				+ "Entry names are translated into JOSM's interface language, so a layer may not be findable under the name it has "
 				+ "in its own country; the id is not translated, which makes a fragment such as 'NRW' or 'PDOK' the more reliable search. "
-				+ "Use the exact name or the id with add_imagery_layer.";
+				+ "'covering' narrows to the entries that actually cover a point or box, which is the reliable "
+				+ "filter in countries whose regions publish their own imagery. Use the exact name or the id with "
+				+ "add_imagery_layer.";
 		case ADD: return "Add an imagery layer (aerial photos, WMS/WMTS) from JOSM's catalogue by name or id; a unique substring of the name is enough. "
 				+ "The user's own entries are searched first. Names are translated into JOSM's interface language, ids are not.";
 		default: return "Remove one or more layers by name, or by the catalogue id an imagery layer came from. "
@@ -87,6 +90,11 @@ public class ImageryTools extends BaseTool {
 					"Only entries for this ISO 3166-1 alpha-2 country code, e.g. 'DE'. Worldwide entries carry no country "
 							+ "and are therefore filtered out, even though they are often the best available aerial; the "
 							+ "result reports how many of them the query also matched as 'worldwide_also_matching'"));
+			props.put("covering", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 2, "maxItems", 4,
+					"description", "Only entries whose coverage includes this place: [lon, lat] for a point or "
+							+ "[min_lon, min_lat, max_lon, max_lat] for a box. This beats 'country' wherever a country "
+							+ "publishes its imagery per region - filtering Belgium by country returns the Flemish "
+							+ "layers alongside the Walloon ones. Entries that declare no bounds are worldwide and always match"));
 			props.put("limit", Map.of("type", "integer", "description", "Maximum number of entries (default 30)"));
 		} else if (mode == Mode.ADD) {
 			props.put("name", Map.of("type", "string", "description", "Exact name or unique substring of the imagery entry"));
@@ -145,6 +153,34 @@ public class ImageryTools extends BaseTool {
 		return m;
 	}
 
+	/** Reads 'covering' as [lon, lat] or [min_lon, min_lat, max_lon, max_lat]. */
+	private static Bounds parseCovering(Object value) throws Exception {
+		if (value == null) {
+			return null;
+		}
+		if (!(value instanceof List)) {
+			throw new Exception("covering must be [lon, lat] or [min_lon, min_lat, max_lon, max_lat]");
+		}
+		List<?> l = (List<?>) value;
+		double[] v = new double[l.size()];
+		for (int i = 0; i < l.size(); i++) {
+			v[i] = toDouble(l.get(i), "covering");
+		}
+		if (v.length == 2) {
+			return new Bounds(v[1], v[0], v[1], v[0]);
+		}
+		if (v.length == 4) {
+			return new Bounds(v[1], v[0], v[3], v[2]);
+		}
+		throw new Exception("covering needs 2 or 4 numbers, got " + v.length);
+	}
+
+	/** An entry without declared bounds is worldwide and covers everything. */
+	private static boolean covers(ImageryInfo i, Bounds wanted) {
+		Bounds b = i.getBounds();
+		return b == null || b.intersects(wanted);
+	}
+
 	/**
 	 * Whether an entry matches a search fragment. Names are translated into JOSM's interface
 	 * language, so the untranslated id is searched as well: "NRW" finds "Noordrijn-Westfalen
@@ -169,9 +205,13 @@ public class ImageryTools extends BaseTool {
 		List<Map<String, Object>> out = new ArrayList<>();
 		List<ImageryInfo> own = ImageryLayerInfo.instance.getLayers();
 		int total = 0;
+		Bounds covering = parseCovering(args == null ? null : args.get("covering"));
 		int worldwide = 0;
 		for (ImageryInfo i : catalogue()) {
 			if (!matches(i, query)) {
+				continue;
+			}
+			if (covering != null && !covers(i, covering)) {
 				continue;
 			}
 			if (country != null && !country.equalsIgnoreCase(i.getCountryCode())) {
@@ -192,6 +232,9 @@ public class ImageryTools extends BaseTool {
 		if (country != null) {
 			r.put("country", country);
 			r.put("worldwide_also_matching", worldwide);
+		}
+		if (covering != null) {
+			r.put("covering", true);
 		}
 		r.put("total_matches", total);
 		r.put("entries", out);
