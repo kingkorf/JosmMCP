@@ -1023,6 +1023,19 @@ class EditToolsTest {
 			// an empty query lists both
 			assertEquals(2, JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
 					.handle(args("query", ""))).path("total_matches").asInt());
+
+			// a worldwide entry has no country, so a country filter hides it - but says how many it hid
+			ImageryInfo world = new ImageryInfo("Esri World Imagery");
+			world.setId("EsriWorldImagery");
+			ImageryLayerInfo.instance.add(world);
+			JsonNode filtered = JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "", "country", "NL")));
+			assertEquals(1, filtered.path("total_matches").asInt());
+			assertEquals(1, filtered.path("worldwide_also_matching").asInt(),
+					"the worldwide entry the filter hid should be counted");
+			// without a country filter the count is absent, not zero
+			assertFalse(JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", ""))).has("worldwide_also_matching"));
 		} finally {
 			ImageryLayerInfo.instance.clear();
 		}

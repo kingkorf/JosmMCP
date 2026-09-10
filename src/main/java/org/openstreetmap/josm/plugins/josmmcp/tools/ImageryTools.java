@@ -84,7 +84,9 @@ public class ImageryTools extends BaseTool {
 					"Case-insensitive substring of the entry's name or its id, e.g. 'PDOK', 'Luchtfoto' or 'DE-NRW'. "
 							+ "Ids are not translated, names are, so prefer an id fragment when looking for another country's layers"));
 			props.put("country", Map.of("type", "string", "description",
-					"Only entries for this ISO 3166-1 alpha-2 country code, e.g. 'DE'. Entries without a country (worldwide) never match"));
+					"Only entries for this ISO 3166-1 alpha-2 country code, e.g. 'DE'. Worldwide entries carry no country "
+							+ "and are therefore filtered out, even though they are often the best available aerial; the "
+							+ "result reports how many of them the query also matched as 'worldwide_also_matching'"));
 			props.put("limit", Map.of("type", "integer", "description", "Maximum number of entries (default 30)"));
 		} else if (mode == Mode.ADD) {
 			props.put("name", Map.of("type", "string", "description", "Exact name or unique substring of the imagery entry"));
@@ -167,11 +169,17 @@ public class ImageryTools extends BaseTool {
 		List<Map<String, Object>> out = new ArrayList<>();
 		List<ImageryInfo> own = ImageryLayerInfo.instance.getLayers();
 		int total = 0;
+		int worldwide = 0;
 		for (ImageryInfo i : catalogue()) {
 			if (!matches(i, query)) {
 				continue;
 			}
 			if (country != null && !country.equalsIgnoreCase(i.getCountryCode())) {
+				// A worldwide entry has no country and is filtered out here, but it is often the best
+				// aerial available for a country whose own catalogue is thin, so say how many were hidden.
+				if (i.getCountryCode() == null || i.getCountryCode().isEmpty()) {
+					worldwide++;
+				}
 				continue;
 			}
 			total++;
@@ -183,6 +191,7 @@ public class ImageryTools extends BaseTool {
 		r.put("query", query);
 		if (country != null) {
 			r.put("country", country);
+			r.put("worldwide_also_matching", worldwide);
 		}
 		r.put("total_matches", total);
 		r.put("entries", out);
