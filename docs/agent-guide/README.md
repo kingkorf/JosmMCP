@@ -105,6 +105,11 @@ The list from `get_josm_state` / `set_layer_visibility` is **top-to-bottom order
   generic term (`DOP`, `ortho`, `ALKIS`) or use the `country` filter. `get_josm_state`
   reports the `locale`, so you know in advance what to expect. The layer tools accept
   that same id, so you can keep using `DE-NRW-DOP` rather than the translated name.
+- **A thin `country` result does not mean there is nothing good.** Worldwide entries
+  (Esri, Bing) carry no country code, so the filter hides them — and in a country whose
+  own catalogue is mostly regional they are often the best aerial available. The result
+  reports how many the filter hid as `worldwide_also_matching`; when that number is not
+  zero, search again without the filter.
 - **Remove several layers in one call.** `remove_layer` takes `layers` as a list; that is
   one confirmation dialog instead of one per layer, and it is all-or-nothing.
 - **Order matters**: index 0 is the top, drawn over everything below it. A layer under
@@ -124,11 +129,18 @@ The list from `get_josm_state` / `set_layer_visibility` is **top-to-bottom order
 
 - Do **not** pass `restore_view: true`. Leave JOSM where the capture zoomed.
 - `wait_ms` 5000–8000 for WMS/WMTS; the default 1500 is too short for aerials.
-- **Past roughly 0.1 m/px a WMTS may upsample a coarser tile and place it wrongly.** An
-  apparent ~10 m offset at extreme zoom is usually this, not bad imagery. Re-capture
-  wider before concluding anything is misaligned. Others simply stop: BDOrtho IGN draws
-  a "no tiles at this zoom level" tile instead of imagery, which is easy to mistake for
-  an area with no coverage.
+- **Imagery is only evidence when you are zoomed in.** Away from a layer's native
+  resolution it misleads in three different ways: past
+  roughly 0.1 m/px a WMTS may upsample a coarser tile and place it several metres off;
+  some layers instead draw a "no tiles at this zoom level" tile that looks like missing
+  coverage; and at overview zoom a coarse tile can show the wrong content outright —
+  Esri rendered the whole Sirmione peninsula as open water. Never make a claim about
+  what is on the ground from an overview capture. Zoom in and look again first.
+- **To compare OSM against a reference layer, capture the same bbox twice — each layer
+  alone.** Stacking them sounds efficient and usually is not: over a dense town centre
+  the OSM POI icons covered the reference's building footprints completely, and the two
+  solo captures made the difference obvious at a glance. Toggle with
+  `set_layer_visibility`, keep the bbox identical so the framing matches.
 - Anchor conclusions to vector geometry — a register's rings, an overlay's outlines,
   OSM's own nodes — not to pixels.
 - `select_elements` before capturing makes the objects under discussion visible in the
@@ -214,6 +226,12 @@ ratio, pull the register's own classification (`propertyName=` keeps that query 
 dropping the geometry) and say which classes you counted. France's BD TOPO `batiment`
 turned out to be a clean building layer — but that was checked, not assumed.
 
+**Not every country has a queryable register.** Italy's regional CTR is a raster overlay
+and the national building data is not openly queryable, so there was no honest ratio to
+compute for Sirmione. Say that, compare the layers visually and describe what you see —
+"the reference shows dozens of individual footprints where OSM has a handful of block
+outlines" is a real finding. Inventing a percentage from an unverified count is not.
+
 **Publish only values you have seen.** Do not infer an identifier, a field name or an
 enum value from a class hierarchy, a naming pattern or a guessed URL: print it once and
 read it. The same goes for endpoints — probing three plausible WFS URLs to find the one
@@ -252,8 +270,10 @@ message.
 
 Scope `changes` also pulls in parent ways of moved nodes. Use `tests` to narrow,
 `max_findings` to cap (the summary still covers all), `output_path` when it is long.
-**PT_Assistant and other plugins' upload-hook checks are not reachable** — tell the
-mapper to run JOSM's own upload check for public-transport routes.
+**Only the upload-hook checks other plugins add are unreachable** — tell the mapper to
+run JOSM's own upload check for those. A plugin's ordinary validator tests do come
+through: PT_Assistant's stop-position and route-gap checks arrived as `test_class`
+`PTAssistantValidatorTest`, code 37051.
 
 ## 10. Editing
 

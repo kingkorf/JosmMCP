@@ -103,6 +103,9 @@ nodes are shared**, e.g. deleting a duplicate way that sits on a coastline.
 `get_josm_state` also reports the interface `locale`.
 
 `list_imagery` matches an entry's **name and its id**, and takes a `country` filter.
+Worldwide entries have no country code, so that filter excludes them; the result reports
+how many the query still matched as `worldwide_also_matching`, which is absent when no
+filter was given.
 Names are translated into JOSM's interface language, ids are not, so an id fragment
 (`DE-NRW`, `PDOK`) or a generic term (`DOP`, `ortho`) is the reliable search;
 `add_imagery_layer` accepts an exact id as well as a name.
