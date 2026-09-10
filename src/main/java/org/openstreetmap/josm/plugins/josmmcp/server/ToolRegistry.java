@@ -23,16 +23,21 @@ import java.util.List;
 import org.openstreetmap.josm.plugins.josmmcp.tools.BaseTool;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CaptureMapView;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateNode;
+import org.openstreetmap.josm.plugins.josmmcp.tools.CreateNodes;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.CreateWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadArea;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadIncomplete;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DownloadOverpass;
+import org.openstreetmap.josm.plugins.josmmcp.tools.FindDuplicateNodes;
+import org.openstreetmap.josm.plugins.josmmcp.tools.FindOrphanNodes;
+import org.openstreetmap.josm.plugins.josmmcp.tools.MergeNodes;
 import org.openstreetmap.josm.plugins.josmmcp.tools.SessionTools;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ImageryTools;
 import org.openstreetmap.josm.plugins.josmmcp.tools.PendingChangesSummary;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadElements;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadHistory;
+import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteElements;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteNode;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteWay;
@@ -44,6 +49,7 @@ import org.openstreetmap.josm.plugins.josmmcp.tools.ReadNode;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReplaceGeometry;
+import org.openstreetmap.josm.plugins.josmmcp.tools.ReshapeArea;
 import org.openstreetmap.josm.plugins.josmmcp.tools.RevertToServer;
 import org.openstreetmap.josm.plugins.josmmcp.tools.SaveLayer;
 import org.openstreetmap.josm.plugins.josmmcp.tools.SearchTool;
@@ -52,6 +58,7 @@ import org.openstreetmap.josm.plugins.josmmcp.tools.SetLayerVisibility;
 import org.openstreetmap.josm.plugins.josmmcp.tools.StateTool;
 import org.openstreetmap.josm.plugins.josmmcp.tools.UndoRedoTool;
 import org.openstreetmap.josm.plugins.josmmcp.tools.UpdateNode;
+import org.openstreetmap.josm.plugins.josmmcp.tools.UpdateNodes;
 import org.openstreetmap.josm.plugins.josmmcp.tools.UpdateRelation;
 import org.openstreetmap.josm.plugins.josmmcp.tools.UpdateWayNodes;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ValidateTool;
@@ -74,6 +81,8 @@ public final class ToolRegistry {
 		t.add(new ReadElements());
 		t.add(new ReadHistory());
 		t.add(new PendingChangesSummary());
+		t.add(new FindDuplicateNodes());
+		t.add(new FindOrphanNodes());
 		// Layers and downloads
 		t.add(new DownloadArea());
 		t.add(new DownloadIncomplete());
@@ -86,11 +95,17 @@ public final class ToolRegistry {
 		t.add(new ReadNode());
 		t.add(new UpdateNode());
 		t.add(new DeleteNode());
+		// Batches
+		t.add(new CreateNodes());
+		t.add(new UpdateNodes());
+		t.add(new DeleteElements());
+		t.add(new MergeNodes());
 		// Ways
 		t.add(new CreateWay());
 		t.add(new ReadWay());
 		t.add(new UpdateWayNodes());
 		t.add(new ReplaceGeometry());
+		t.add(new ReshapeArea());
 		t.add(new DeleteWay());
 		// Relations
 		t.add(new CreateRelation());
