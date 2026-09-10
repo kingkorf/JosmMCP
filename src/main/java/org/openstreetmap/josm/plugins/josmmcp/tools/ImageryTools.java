@@ -68,7 +68,10 @@ public class ImageryTools extends BaseTool {
 				+ "Use the exact name or the id with add_imagery_layer.";
 		case ADD: return "Add an imagery layer (aerial photos, WMS/WMTS) from JOSM's catalogue by name or id; a unique substring of the name is enough. "
 				+ "The user's own entries are searched first. Names are translated into JOSM's interface language, ids are not.";
-		default: return "Remove a layer by name. Data layers with unsaved changes are refused unless force=true; the active data layer is never removed.";
+		default: return "Remove one or more layers by name, or by the catalogue id an imagery layer came from. "
+				+ "Give 'layer' for one or 'layers' for several; removing several is a single confirmation and is "
+				+ "all-or-nothing, so nothing is removed when one of them is refused. Data layers with unsaved changes "
+				+ "are refused unless force=true; the active data layer is never removed.";
 		}
 	}
 
@@ -87,9 +90,11 @@ public class ImageryTools extends BaseTool {
 			props.put("name", Map.of("type", "string", "description", "Exact name or unique substring of the imagery entry"));
 			required.add("name");
 		} else {
-			props.put("layer", Map.of("type", "string", "description", "Exact layer name or unique substring"));
+			props.put("layer", Map.of("type", "string", "description",
+					"One layer: exact name, unique substring, or the catalogue id of an imagery layer"));
+			props.put("layers", Map.of("type", "array", "items", Map.of("type", "string"), "description",
+					"Several layers, each named the same way as 'layer'. Removed as one confirmation, all or nothing"));
 			props.put("force", Map.of("type", "boolean", "description", "Also remove a data layer with unsaved changes"));
-			required.add("layer");
 		}
 		return new McpSchema.JsonSchema("object", props, required.isEmpty() ? null : required, null, null, null);
 	}
@@ -244,44 +249,56 @@ public class ImageryTools extends BaseTool {
 	}
 
 	private String remove(Map<String, Object> args) throws Exception {
-		String wanted = requireArg(args, "layer").toString();
+		List<String> wanted = new ArrayList<>();
+		Object many = args == null ? null : args.get("layers");
+		if (many != null) {
+			if (!(many instanceof List)) {
+				throw new Exception("layers must be an array of strings");
+			}
+			for (Object o : (List<?>) many) {
+				wanted.add(String.valueOf(o));
+			}
+		}
+		Object one = args == null ? null : args.get("layer");
+		if (one != null) {
+			wanted.add(one.toString());
+		}
+		if (wanted.isEmpty()) {
+			throw new Exception("give 'layer' or 'layers'");
+		}
+
+		// Resolve and check everything first, so a refusal leaves the whole stack untouched.
 		List<Layer> layers = MainApplication.getLayerManager().getLayers();
-		Layer target = null;
-		List<Layer> partial = new ArrayList<>();
-		for (Layer l : layers) {
-			if (l.getName().equals(wanted)) {
-				target = l;
-				break;
+		List<Layer> targets = new ArrayList<>();
+		boolean force = Boolean.TRUE.equals(args.get("force"));
+		for (String w : wanted) {
+			Layer target = JosmUtils.findLayer(layers, w);
+			if (targets.contains(target)) {
+				continue;
 			}
-			if (l.getName().toLowerCase(Locale.ROOT).contains(wanted.toLowerCase(Locale.ROOT))) {
-				partial.add(l);
+			if (target == MainApplication.getLayerManager().getEditLayer()) {
+				throw new Exception("the active data layer is never removed by this tool");
 			}
-		}
-		if (target == null) {
-			if (partial.size() == 1) {
-				target = partial.get(0);
-			} else if (partial.isEmpty()) {
-				throw new Exception("no layer matches '" + wanted + "'");
-			} else {
-				throw new Exception("layer name '" + wanted + "' is ambiguous: " + partial.size() + " layers match");
+			if (target instanceof OsmDataLayer && ((OsmDataLayer) target).isModified() && !force) {
+				throw new Exception("data layer '" + target.getName()
+						+ "' has unsaved changes; pass force=true to remove it anyway");
 			}
+			targets.add(target);
 		}
-		if (target == MainApplication.getLayerManager().getEditLayer()) {
-			throw new Exception("the active data layer is never removed by this tool");
+
+		List<String> removed = new ArrayList<>();
+		for (Layer target : targets) {
+			MainApplication.getLayerManager().removeLayer(target);
+			removed.add(target.getName());
 		}
-		if (target instanceof OsmDataLayer && ((OsmDataLayer) target).isModified() && !Boolean.TRUE.equals(args.get("force"))) {
-			throw new Exception("data layer '" + target.getName() + "' has unsaved changes; pass force=true to remove it anyway");
-		}
-		MainApplication.getLayerManager().removeLayer(target);
 		List<String> remaining = new ArrayList<>();
 		for (Layer l : MainApplication.getLayerManager().getLayers()) {
 			remaining.add(l.getName());
 		}
-		return JosmUtils.toJson(Map.of("removed", target.getName(), "layers", remaining));
+		Map<String, Object> r = new LinkedHashMap<>();
+		r.put("removed", removed);
+		r.put("layers", remaining);
+		return JosmUtils.toJson(r);
 	}
 
-	@Override
-	protected String describeForConfirmation(Map<String, Object> args) {
-		return "Remove layer: " + (args == null ? "" : args.get("layer"));
-	}
 }

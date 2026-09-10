@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -50,6 +51,8 @@ import org.openstreetmap.josm.data.imagery.ImageryLayerInfo;
 import org.openstreetmap.josm.data.preferences.JosmUrls;
 import org.openstreetmap.josm.data.projection.Projections;
 import org.openstreetmap.josm.gui.MainApplication;
+import org.openstreetmap.josm.gui.layer.ImageryLayer;
+import org.openstreetmap.josm.plugins.josmmcp.utils.JosmUtils;
 import org.openstreetmap.josm.gui.layer.Layer;
 import org.openstreetmap.josm.gui.layer.OsmDataLayer;
 import org.openstreetmap.josm.plugins.josmmcp.utils.PlanarGeometry;
@@ -1022,6 +1025,67 @@ class EditToolsTest {
 					.handle(args("query", ""))).path("total_matches").asInt());
 		} finally {
 			ImageryLayerInfo.instance.clear();
+		}
+	}
+
+
+	@Test
+	void removeLayerTakesAListAndIsAllOrNothing() throws Exception {
+		OsmDataLayer a = new OsmDataLayer(new DataSet(), "spare a", null);
+		OsmDataLayer b = new OsmDataLayer(new DataSet(), "spare b", null);
+		MainApplication.getLayerManager().addLayer(a);
+		MainApplication.getLayerManager().addLayer(b);
+		// the layer created by @BeforeEach stays active, so these two are removable
+		MainApplication.getLayerManager().setActiveLayer(layer);
+		try {
+			// naming the active data layer refuses the whole batch, leaving both spares in place
+			assertThrows(Exception.class, () -> new ImageryTools(ImageryTools.Mode.REMOVE)
+					.handle(args("layers", Arrays.asList("spare a", "test", "spare b"))));
+			assertEquals(3, MainApplication.getLayerManager().getLayers().size());
+
+			JsonNode r = JSON.readTree(new ImageryTools(ImageryTools.Mode.REMOVE)
+					.handle(args("layers", Arrays.asList("spare a", "spare b"))));
+			assertEquals(2, r.path("removed").size());
+			assertEquals(1, MainApplication.getLayerManager().getLayers().size());
+		} finally {
+			for (OsmDataLayer l : Arrays.asList(a, b)) {
+				if (MainApplication.getLayerManager().containsLayer(l)) {
+					MainApplication.getLayerManager().removeLayer(l);
+				}
+			}
+		}
+	}
+
+	@Test
+	void layersAreAlsoFoundByTheirImageryId() throws Exception {
+		ImageryInfo info = new ImageryInfo("Noordrijn-Westfalen luchtfoto's",
+				"tms:https://example.invalid/{zoom}/{x}/{y}.png");
+		info.setId("DE-NRW-DOP");
+		Layer imagery;
+		try {
+			imagery = ImageryLayer.create(info);
+		} catch (RuntimeException | LinkageError e) {
+			assumeTrue(false, "imagery layers cannot be constructed headless: " + e);
+			return;
+		}
+		MainApplication.getLayerManager().addLayer(imagery);
+		try {
+			// the layer is named after its translated catalogue name, but the id resolves too
+			assertEquals(imagery, JosmUtils.findLayer(MainApplication.getLayerManager().getLayers(), "DE-NRW-DOP"));
+			assertEquals(imagery, JosmUtils.findLayer(MainApplication.getLayerManager().getLayers(), "nrw"));
+			assertEquals(imagery, JosmUtils.findLayer(MainApplication.getLayerManager().getLayers(), "luchtfoto"));
+
+			JsonNode r = JSON.readTree(new SetLayerVisibility().handle(args("layer", "DE-NRW-DOP", "visible", false)));
+			assertEquals("Noordrijn-Westfalen luchtfoto's", r.path("changed").asText());
+			boolean sawId = false;
+			for (JsonNode l : r.path("layers")) {
+				if ("DE-NRW-DOP".equals(l.path("imagery_id").asText(null))) {
+					sawId = true;
+				}
+			}
+			assertTrue(sawId, "the layer list should report imagery_id");
+		} finally {
+			MainApplication.getLayerManager().removeLayer(imagery);
 		}
 	}
 
