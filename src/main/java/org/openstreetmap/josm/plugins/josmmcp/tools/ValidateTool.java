@@ -261,6 +261,7 @@ public class ValidateTool extends BaseTool {
 		}
 
 		int nFixed = 0;
+		int nFixUnavailable = 0;
 		if (fix) {
 			for (TestError err : errors) {
 				if (!err.isIgnored() && err.isFixable()) {
@@ -268,6 +269,10 @@ public class ValidateTool extends BaseTool {
 					if (c != null) {
 						addCommand(c, tr("Fix: {0}", err.getMessage()));
 						nFixed++;
+					} else {
+						// isFixable() only promises the test knows a fix; some tests (PT_Assistant) only
+						// offer it through a dialog and return no command here.
+						nFixUnavailable++;
 					}
 				}
 			}
@@ -318,6 +323,12 @@ public class ValidateTool extends BaseTool {
 		result.put("tests_run", tests.size());
 		if (fix) {
 			result.put("fixed", nFixed);
+			if (nFixUnavailable > 0) {
+				result.put("fix_unavailable", nFixUnavailable);
+				result.put("fix_unavailable_note", "these findings report fixable=true but their test only offers the "
+						+ "fix through a dialog in JOSM (PT_Assistant works that way), so nothing was applied for "
+						+ "them; fix them by hand or in JOSM's validator panel");
+			}
 		}
 		result.put("errors", nErrors);
 		result.put("warnings", nWarnings);
