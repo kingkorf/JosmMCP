@@ -2,6 +2,15 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-09-10
+
+### Added
+- `move_layer`: reorder the layer stack, like dragging a layer in JOSM's layer list. Takes exactly one of `position` (absolute index, clamped), `direction` (`up`, `down`, `top`, `bottom`), `above` or `below` (another layer by name). Index 0 is the top of the stack, so this is what puts an overlay such as *BAG panden* above the imagery that was hiding it - until now the only way to see such a layer was to hide everything above it. The result lists every layer with its index.
+- `docs/agent-guide/`: a client-neutral guide for LLM agents driving JOSM through this server - efficient use of the tools (result size, batching, the confirmation and undo guards), per-tool pitfalls, wiki-first tagging with the OSM good-practice and verifiability principles, and the Dutch registers. Any client can read the Markdown directly; `tools/sync-agent-skill.py` writes the same text plus frontmatter to an untracked `.claude/skills/osm-mapping/SKILL.md` for Claude Code, and `AgentGuideTest` keeps that copy honest when it is present.
+
+### Changed
+- `set_layer_visibility` now reports each layer's `index`, and shares its layer lookup with `move_layer`: an ambiguous substring names the layers that matched instead of only counting them.
+
 ## [0.5.0] - 2026-09-10
 
 ### Added

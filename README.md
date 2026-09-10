@@ -57,6 +57,7 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 * `select_elements` – select objects in JOSM (optionally zoom to them) so the mapper sees them
 * `capture_map_view` – render the map view (data plus imagery) to an image, optionally zooming to an element or bbox first and restoring the view afterwards
 * `set_layer_visibility` – show/hide a layer or set its opacity
+* `move_layer` – move a layer up or down the stack (`position`, `direction`, `above` or `below`), so an overlay can be put above the imagery that was covering it; index 0 is the top
 * `search_elements` – JOSM search expressions with `bbox`, `polygon`, `center`+`radius_m`, `ids`, `fields`, `offset`/`max_results`. `key=value` is an exact, case sensitive match without wildcards, so `regex=true` reads the values as regular expressions that must match the whole value (`"source:date"=2014.*`); `case_sensitive` then decides whether that regex ignores case. `include_geometry` adds `nodes: [{id, lat, lon}]` to every way in the result, so outlines can be compared with an external source without reading each way separately
 * `find_orphan_nodes` – untagged nodes used by no way or relation (by default only new or modified ones), ready for `delete_elements`
 * `find_duplicate_nodes` – groups of nodes at the same position (or within `tolerance_m`) in a bbox or the whole layer, with tags, parent ways and whether merging would conflict
@@ -116,6 +117,23 @@ Every modifying tool call is appended to `josmmcp-audit.log` in JOSM's user data
 ## Resources and prompts
 
 Resources `josm://state` and `josm://selection` expose the same JSON as the corresponding tools. Four prompts describe tested workflows: `review-area` (measure completeness and propose improvements), `bag-sync` (synchronise buildings with the Dutch BAG register), `surface-from-bgt` (derive `surface` from the Dutch BGT) and `bus-stops-chb` (check bus stops against the Dutch CHB register).
+
+## Guide for agents
+
+`docs/agent-guide/` is a client-neutral guide for any LLM agent driving JOSM through
+this server. It covers how to use the tools efficiently — keeping result sizes down
+with `fields`, `output_path` and `include_geometry`, batching so the mapper gets one
+undo step and one confirmation dialog instead of dozens, how the confirmation and undo
+guards behave, and the per-tool pitfalls that are easy to miss. It also makes the
+[OSM wiki](https://wiki.openstreetmap.org/) the first place the agent looks for any
+tagging question, and carries the good-practice and verifiability principles that decide
+whether something belongs in OpenStreetMap at all.
+
+Point your client at `docs/agent-guide/README.md`, or paste it into the system prompt.
+For Claude Code, `tools/sync-agent-skill.py` writes the same guide to
+`.claude/skills/osm-mapping/SKILL.md` with the frontmatter a skill needs, so it loads
+automatically while you work in the repository. That copy is generated and not tracked
+here; when it is present, `AgentGuideTest` fails the build if the two drift apart.
 
 ## Limitations
 
