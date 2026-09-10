@@ -45,6 +45,9 @@ import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
 import org.openstreetmap.josm.data.osm.SimplePrimitiveId;
 import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.projection.ProjectionRegistry;
+import org.openstreetmap.josm.data.imagery.ImageryInfo;
+import org.openstreetmap.josm.data.imagery.ImageryLayerInfo;
+import org.openstreetmap.josm.data.preferences.JosmUrls;
 import org.openstreetmap.josm.data.projection.Projections;
 import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.gui.layer.Layer;
@@ -96,6 +99,8 @@ class EditToolsTest {
 				return dir("cache", createIfMissing);
 			}
 		});
+		// The imagery catalogue reads JOSM's URLs on class initialisation.
+		Config.setUrlsProvider(JosmUrls.getInstance());
 		ProjectionRegistry.setProjection(Projections.getProjectionByCode("EPSG:3857"));
 	}
 
@@ -962,6 +967,61 @@ class EditToolsTest {
 			assertThrows(Exception.class, () -> new MoveLayer().handle(args("layer", "nosuchlayer", "direction", "up")));
 		} finally {
 			MainApplication.getLayerManager().removeLayer(alpha);
+		}
+	}
+
+
+	@Test
+	void validateFindingsCarryALocaleIndependentHandle() throws Exception {
+		Way w = square();
+		// building=construction together with construction=yes is an "unlikely tag combination"
+		new ModifyTags().handle(args("element_type", "way", "element_id", w.getUniqueId(),
+				"tags", Map.of("building", "construction", "construction", "yes")));
+		JsonNode r = JSON.readTree(new ValidateTool().handle(args("scope", "changes")));
+		JsonNode findings = r.path("findings");
+		assertTrue(findings.size() > 0, "expected at least one finding");
+		JsonNode f = findings.get(0);
+		// message and test are translated; test_class and code are not
+		assertTrue(f.hasNonNull("test_class"), "a finding needs a test_class");
+		assertTrue(f.has("code"), "a finding needs a code");
+		assertFalse(f.path("test_class").asText().isEmpty());
+		assertTrue(f.path("code").isInt());
+	}
+
+	@Test
+	void listImageryMatchesTheUntranslatedId() throws Exception {
+		// Catalogue names follow JOSM's interface language; ids do not. A Dutch JOSM shows the
+		// North Rhine-Westphalia aerial as "Noordrijn-Westfalen luchtfoto's", so a search for
+		// "NRW" only works if the id is searched too.
+		ImageryInfo nrw = new ImageryInfo("Noordrijn-Westfalen luchtfoto's");
+		nrw.setId("DE-NRW-DOP");
+		nrw.setCountryCode("DE");
+		ImageryInfo nl = new ImageryInfo("Luchtfoto Nederland");
+		nl.setId("NL-PDOK-ORTHO");
+		nl.setCountryCode("NL");
+		ImageryLayerInfo.instance.add(nrw);
+		ImageryLayerInfo.instance.add(nl);
+		try {
+			JsonNode byId = JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST).handle(args("query", "NRW")));
+			assertEquals(1, byId.path("total_matches").asInt(), "the id fragment should find the entry");
+			assertEquals("DE-NRW-DOP", byId.path("entries").get(0).path("id").asText());
+
+			// the translated name still works
+			assertEquals(1, JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "noordrijn"))).path("total_matches").asInt());
+
+			// and the country filter narrows without needing to know either name
+			JsonNode dutch = JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", "", "country", "nl")));
+			assertEquals("NL", dutch.path("country").asText());
+			assertEquals(1, dutch.path("total_matches").asInt());
+			assertEquals("NL-PDOK-ORTHO", dutch.path("entries").get(0).path("id").asText());
+
+			// an empty query lists both
+			assertEquals(2, JSON.readTree(new ImageryTools(ImageryTools.Mode.LIST)
+					.handle(args("query", ""))).path("total_matches").asInt());
+		} finally {
+			ImageryLayerInfo.instance.clear();
 		}
 	}
 

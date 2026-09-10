@@ -61,8 +61,13 @@ public class ImageryTools extends BaseTool {
 	@Override
 	public String getDescription() {
 		switch (mode) {
-		case LIST: return "List imagery sources from JOSM's catalogue (the user's own entries plus the built-in list) whose name contains 'query'. Use the exact name with add_imagery_layer.";
-		case ADD: return "Add an imagery layer (aerial photos, WMS/WMTS) from JOSM's catalogue by name; a unique substring is enough. The user's own entries are searched first.";
+		case LIST: return "List imagery sources from JOSM's catalogue (the user's own entries plus the built-in list) matching 'query'. "
+				+ "The query matches the entry's name and its id, and 'country' filters by ISO country code. "
+				+ "Entry names are translated into JOSM's interface language, so a layer may not be findable under the name it has "
+				+ "in its own country; the id is not translated, which makes a fragment such as 'NRW' or 'PDOK' the more reliable search. "
+				+ "Use the exact name or the id with add_imagery_layer.";
+		case ADD: return "Add an imagery layer (aerial photos, WMS/WMTS) from JOSM's catalogue by name or id; a unique substring of the name is enough. "
+				+ "The user's own entries are searched first. Names are translated into JOSM's interface language, ids are not.";
 		default: return "Remove a layer by name. Data layers with unsaved changes are refused unless force=true; the active data layer is never removed.";
 		}
 	}
@@ -72,7 +77,11 @@ public class ImageryTools extends BaseTool {
 		Map<String, Object> props = new HashMap<>();
 		List<String> required = new ArrayList<>();
 		if (mode == Mode.LIST) {
-			props.put("query", Map.of("type", "string", "description", "Case-insensitive substring, e.g. 'PDOK' or 'Luchtfoto'"));
+			props.put("query", Map.of("type", "string", "description",
+					"Case-insensitive substring of the entry's name or its id, e.g. 'PDOK', 'Luchtfoto' or 'DE-NRW'. "
+							+ "Ids are not translated, names are, so prefer an id fragment when looking for another country's layers"));
+			props.put("country", Map.of("type", "string", "description",
+					"Only entries for this ISO 3166-1 alpha-2 country code, e.g. 'DE'. Entries without a country (worldwide) never match"));
 			props.put("limit", Map.of("type", "integer", "description", "Maximum number of entries (default 30)"));
 		} else if (mode == Mode.ADD) {
 			props.put("name", Map.of("type", "string", "description", "Exact name or unique substring of the imagery entry"));
@@ -129,23 +138,47 @@ public class ImageryTools extends BaseTool {
 		return m;
 	}
 
+	/**
+	 * Whether an entry matches a search fragment. Names are translated into JOSM's interface
+	 * language, so the untranslated id is searched as well: "NRW" finds "Noordrijn-Westfalen
+	 * luchtfoto's" through its id DE-NRW-DOP.
+	 */
+	private static boolean matches(ImageryInfo i, String lowerQuery) {
+		if (lowerQuery.isEmpty()) {
+			return true;
+		}
+		if (i.getName() != null && i.getName().toLowerCase(Locale.ROOT).contains(lowerQuery)) {
+			return true;
+		}
+		return i.getId() != null && i.getId().toLowerCase(Locale.ROOT).contains(lowerQuery);
+	}
+
 	private String list(Map<String, Object> args) throws Exception {
 		Object q = args == null ? null : args.get("query");
 		String query = q == null ? "" : q.toString().toLowerCase(Locale.ROOT);
+		Object c = args == null ? null : args.get("country");
+		String country = c == null ? null : c.toString().trim().toUpperCase(Locale.ROOT);
 		int limit = getInt(args, "limit", 30);
 		List<Map<String, Object>> out = new ArrayList<>();
 		List<ImageryInfo> own = ImageryLayerInfo.instance.getLayers();
 		int total = 0;
 		for (ImageryInfo i : catalogue()) {
-			if (i.getName() != null && i.getName().toLowerCase(Locale.ROOT).contains(query)) {
-				total++;
-				if (out.size() < limit) {
-					out.add(describe(i, own.contains(i)));
-				}
+			if (!matches(i, query)) {
+				continue;
+			}
+			if (country != null && !country.equalsIgnoreCase(i.getCountryCode())) {
+				continue;
+			}
+			total++;
+			if (out.size() < limit) {
+				out.add(describe(i, own.contains(i)));
 			}
 		}
 		Map<String, Object> r = new LinkedHashMap<>();
 		r.put("query", query);
+		if (country != null) {
+			r.put("country", country);
+		}
 		r.put("total_matches", total);
 		r.put("entries", out);
 		return JosmUtils.toJson(r);
@@ -157,14 +190,21 @@ public class ImageryTools extends BaseTool {
 		ImageryInfo match = null;
 		List<ImageryInfo> partial = new ArrayList<>();
 		for (ImageryInfo i : catalogue()) {
-			if (i.getName() == null) {
+			if (i.getName() == null && i.getId() == null) {
 				continue;
 			}
-			if (i.getName().equals(wanted)) {
+			if (i.getName() == null) {
+				if (wanted.equals(i.getId())) {
+					match = i;
+					break;
+				}
+				continue;
+			}
+			if (i.getName().equals(wanted) || wanted.equals(i.getId())) {
 				match = i;
 				break;
 			}
-			if (i.getName().toLowerCase(Locale.ROOT).contains(wanted.toLowerCase(Locale.ROOT))) {
+			if (matches(i, wanted.toLowerCase(Locale.ROOT))) {
 				partial.add(i);
 			}
 		}
