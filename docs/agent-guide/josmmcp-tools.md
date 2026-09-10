@@ -29,8 +29,8 @@ independently of global read-only mode.
 - `include_other: true` adds informational findings — only when you intend to act.
 - Every finding carries `test` and `message` (**translated** into JOSM's interface
   language) plus `test_class` and `code` (**not** translated). Match on the latter two.
-  All MapCSS tag checks share `test_class` `MapCSSTagChecker`, so for those, read the
-  flagged element's tags instead of parsing the message.
+  All MapCSS tag checks share `test_class` `MapCSSTagCheckerAndRule` and `code` 3000,
+  so for those, read the flagged element's tags instead of parsing the message.
 - `fix: true` applies automatic fixes, each as its own undo step. Findings that call
   themselves fixable but only offer the fix through a dialog come back as
   `fix_unavailable` rather than being silently skipped.

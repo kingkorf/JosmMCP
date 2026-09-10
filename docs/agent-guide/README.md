@@ -228,8 +228,9 @@ findings the validator does not raise are still findings.
 
 Match findings on `test_class` and `code`, never on `message` or `test`: those two are
 translated into JOSM's interface language and will not match in another locale. All
-MapCSS-based tag checks share `test_class` `MapCSSTagChecker`, so fall back to reading
-the tags of the flagged element rather than parsing its message.
+MapCSS-based tag checks share `test_class` `MapCSSTagCheckerAndRule` and `code` 3000, so
+for those fall back to reading the tags of the flagged element rather than parsing its
+message.
 
 Scope `changes` also pulls in parent ways of moved nodes. Use `tests` to narrow,
 `max_findings` to cap (the summary still covers all), `output_path` when it is long.

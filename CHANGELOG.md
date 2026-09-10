@@ -9,7 +9,7 @@ All notable changes to JosmMCP. The format follows [Keep a Changelog](https://ke
 
 ### Added
 - `list_imagery`: a `country` filter taking an ISO 3166-1 alpha-2 code, so another country's layers can be found without guessing their translated name.
-- `validate`: every finding carries `test_class` (the validator test's class name) and `code` beside the already present `test` and `message`. Those two are not translated, so a client can recognise a finding whatever language JOSM runs in; the message strings cannot be relied on for that. All MapCSS-based tag checks share the class `MapCSSTagChecker`.
+- `validate`: every finding carries `test_class` (the validator test's class name) and `code` beside the already present `test` and `message`. Those two are not translated, so a client can recognise a finding whatever language JOSM runs in; the message strings cannot be relied on for that. All MapCSS-based tag checks share the class `MapCSSTagCheckerAndRule` and code 3000.
 - `get_josm_state`: reports JOSM's interface `locale`, so a client knows up front that validator messages, imagery names and preset names come back translated.
 - `docs/agent-guide/german-sources.md`: a second worked example of verifying against a national register, for the NRW ALKIS WFS, including the trap that `ave:GebaeudeBauwerk` counts canopies and building parts as well as buildings.
 
