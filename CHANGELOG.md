@@ -2,6 +2,11 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] - 2026-09-11
+
+### Changed
+- `docs/agent-guide/`: the guidance on taginfo now covers both directions. It previously only warned that low usage exposes an invented tag; a high count is just as misleading the other way, because it says a tag exists and nothing about whether it belongs. `landuse=static_caravan` has 32 445 uses and only the wiki explains that it marks BAG plot outlines rather than buildings, which is what distinguishes a correct dual mapping from a tagging error.
+
 ## [0.8.1] - 2026-09-11
 
 ### Added
