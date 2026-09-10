@@ -81,7 +81,9 @@
     <finalName>josmmcp</finalName>
 
     <plugins>
-      <!-- Fetch the JOSM jar once; skipped when lib/josm-latest.jar already exists. -->
+      <!-- Fetch the JOSM jar once (mvn validate); skipped when lib/josm-latest.jar already exists.
+           This must run as a separate Maven invocation: Maven resolves the system-scope dependency
+           for the whole build before the first plugin executes. -->
       <plugin>
         <groupId>com.googlecode.maven-download-plugin</groupId>
         <artifactId>download-maven-plugin</artifactId>

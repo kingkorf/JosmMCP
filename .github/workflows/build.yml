@@ -15,6 +15,10 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+      # Maven resolves all dependencies before the first plugin runs, so the JOSM jar
+      # (a system-scope dependency, not on Maven Central) must be fetched in a separate run.
+      - name: Fetch JOSM jar
+        run: mvn -B --no-transfer-progress validate
       - name: Build and test
         run: mvn -B --no-transfer-progress package
       - uses: actions/upload-artifact@v4

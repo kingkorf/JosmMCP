@@ -15,6 +15,9 @@ All notable changes to JosmMCP. The format follows [Keep a Changelog](https://ke
 - `save_session`, `open_session`, `restart_josm` (the latter behind the confirmation dialog).
 - Prompt `bus-stops-chb` describing how to check bus stops against the Dutch CHB register.
 
+### Fixed
+- Build from a fresh clone: the JOSM jar is fetched in a separate `mvn validate` run because Maven resolves dependencies before any plugin executes (the GitHub build failed on this).
+
 ### Changed
 - Every command the plugin puts on the undo stack is now marked "(MCP)" in its description, so the undo guard recognises all of them.
 

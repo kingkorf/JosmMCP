@@ -111,10 +111,11 @@ Resources `josm://state` and `josm://selection` expose the same JSON as the corr
 Requirements: JDK 17 or newer and [Maven](https://maven.apache.org/).
 
 ```bash
+mvn validate        # first time only: downloads josm-latest.jar into lib/
 mvn clean package
 ```
 
-The first build downloads `josm-latest.jar` into the `lib` folder (JOSM is not published to Maven Central). Delete that file to pick up a newer JOSM. The resulting plugin jar with all dependencies is `target/josmmcp.jar`. The test suite starts the real server on an ephemeral port and exercises the tool list, the security filter, read-only mode, resources and prompts, and runs the editing tools against an in-memory layer. Tagged commits `v*` are built and published as GitHub releases.
+JOSM is not published to Maven Central, so the `validate` phase downloads `josm-latest.jar` into the `lib` folder. This has to be a separate Maven run: Maven resolves all dependencies before the first plugin runs, so `mvn package` fails on a fresh clone until the jar is there. Delete the file to pick up a newer JOSM. The resulting plugin jar with all dependencies is `target/josmmcp.jar`. The test suite starts the real server on an ephemeral port and exercises the tool list, the security filter, read-only mode, resources and prompts, and runs the editing tools against an in-memory layer. Tagged commits `v*` are built and published as GitHub releases.
 
 ## Installing the plugin in JOSM
 
