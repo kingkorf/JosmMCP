@@ -47,6 +47,7 @@ import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.projection.ProjectionRegistry;
 import org.openstreetmap.josm.data.projection.Projections;
 import org.openstreetmap.josm.gui.MainApplication;
+import org.openstreetmap.josm.gui.layer.Layer;
 import org.openstreetmap.josm.gui.layer.OsmDataLayer;
 import org.openstreetmap.josm.plugins.josmmcp.utils.PlanarGeometry;
 import org.openstreetmap.josm.spi.preferences.Config;
@@ -891,4 +892,77 @@ class EditToolsTest {
 		JsonNode rel = JSON.readTree(new SearchTool().handle(args("query", "type:relation", "include_geometry", true)));
 		assertTrue(rel.path("elements").get(0).path("nodes").isMissingNode(), "relations are not expanded");
 	}
+
+	private static int idx(String name) {
+		List<Layer> ls = MainApplication.getLayerManager().getLayers();
+		for (int i = 0; i < ls.size(); i++) {
+			if (ls.get(i).getName().equals(name)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	@Test
+	void moveLayerReordersTheStack() throws Exception {
+		OsmDataLayer alpha = new OsmDataLayer(new DataSet(), "alpha", null);
+		OsmDataLayer beta = new OsmDataLayer(new DataSet(), "beta", null);
+		MainApplication.getLayerManager().addLayer(alpha);
+		MainApplication.getLayerManager().addLayer(beta);
+		try {
+			int count = MainApplication.getLayerManager().getLayers().size();
+			assertEquals(3, count);
+
+			JsonNode r = JSON.readTree(new MoveLayer().handle(args("layer", "beta", "direction", "top")));
+			assertEquals(0, r.path("to_index").asInt());
+			assertEquals(0, idx("beta"));
+			// the result lists every layer with its index
+			assertEquals(count, r.path("layers").size());
+			assertEquals("beta", r.path("layers").get(0).path("name").asText());
+
+			new MoveLayer().handle(args("layer", "beta", "direction", "bottom"));
+			assertEquals(count - 1, idx("beta"));
+
+			// one step back up
+			new MoveLayer().handle(args("layer", "beta", "direction", "up"));
+			assertEquals(count - 2, idx("beta"));
+
+			new MoveLayer().handle(args("layer", "alpha", "above", "beta"));
+			assertEquals(idx("beta") - 1, idx("alpha"));
+
+			new MoveLayer().handle(args("layer", "alpha", "below", "beta"));
+			assertEquals(idx("beta") + 1, idx("alpha"));
+
+			// an absolute position, and out-of-range values clamp instead of failing
+			new MoveLayer().handle(args("layer", "alpha", "position", 0));
+			assertEquals(0, idx("alpha"));
+			JsonNode clamped = JSON.readTree(new MoveLayer().handle(args("layer", "alpha", "position", 99)));
+			assertEquals(count - 1, clamped.path("to_index").asInt());
+
+			// moving to where it already is is reported, not an error
+			JsonNode same = JSON.readTree(new MoveLayer().handle(args("layer", "alpha", "direction", "bottom")));
+			assertTrue(same.path("unchanged").asBoolean());
+		} finally {
+			MainApplication.getLayerManager().removeLayer(alpha);
+			MainApplication.getLayerManager().removeLayer(beta);
+		}
+	}
+
+	@Test
+	void moveLayerRejectsAmbiguousAndConflictingArguments() throws Exception {
+		OsmDataLayer alpha = new OsmDataLayer(new DataSet(), "alpha", null);
+		MainApplication.getLayerManager().addLayer(alpha);
+		try {
+			assertThrows(Exception.class, () -> new MoveLayer().handle(args("layer", "alpha")));
+			assertThrows(Exception.class,
+					() -> new MoveLayer().handle(args("layer", "alpha", "direction", "up", "position", 0)));
+			assertThrows(Exception.class,
+					() -> new MoveLayer().handle(args("layer", "alpha", "direction", "sideways")));
+			assertThrows(Exception.class, () -> new MoveLayer().handle(args("layer", "alpha", "above", "alpha")));
+			assertThrows(Exception.class, () -> new MoveLayer().handle(args("layer", "nosuchlayer", "direction", "up")));
+		} finally {
+			MainApplication.getLayerManager().removeLayer(alpha);
+		}
+	}
+
 }

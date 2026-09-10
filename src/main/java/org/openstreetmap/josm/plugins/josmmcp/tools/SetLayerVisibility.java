@@ -17,7 +17,6 @@
  */
 package org.openstreetmap.josm.plugins.josmmcp.tools;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -69,28 +68,7 @@ public class SetLayerVisibility extends BaseTool {
 	public String handle(Map<String, Object> args) throws Exception {
 		String wanted = requireArg(args, "layer").toString();
 		List<Layer> layers = MainApplication.getLayerManager().getLayers();
-		Layer target = null;
-		for (Layer l : layers) {
-			if (l.getName().equals(wanted)) {
-				target = l;
-				break;
-			}
-		}
-		if (target == null) {
-			List<Layer> matches = new ArrayList<>();
-			for (Layer l : layers) {
-				if (l.getName().toLowerCase(java.util.Locale.ROOT).contains(wanted.toLowerCase(java.util.Locale.ROOT))) {
-					matches.add(l);
-				}
-			}
-			if (matches.size() == 1) {
-				target = matches.get(0);
-			} else if (matches.isEmpty()) {
-				throw new Exception("no layer matches '" + wanted + "'");
-			} else {
-				throw new Exception("layer name '" + wanted + "' is ambiguous: " + matches.size() + " layers match");
-			}
-		}
+		Layer target = JosmUtils.findLayer(layers, wanted);
 
 		Object vis = args.get("visible");
 		if (vis != null) {
@@ -108,18 +86,9 @@ public class SetLayerVisibility extends BaseTool {
 			target.setOpacity(o);
 		}
 
-		List<Map<String, Object>> out = new ArrayList<>();
-		for (Layer l : layers) {
-			Map<String, Object> m = new LinkedHashMap<>();
-			m.put("name", l.getName());
-			m.put("type", l.getClass().getSimpleName());
-			m.put("visible", l.isVisible());
-			m.put("opacity", l.getOpacity());
-			out.add(m);
-		}
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("changed", target.getName());
-		result.put("layers", out);
+		result.put("layers", JosmUtils.describeLayers(layers));
 		return JosmUtils.toJson(result);
 	}
 

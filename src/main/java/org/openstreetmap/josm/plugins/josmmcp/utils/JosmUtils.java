@@ -29,6 +29,7 @@ import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.Relation;
 import org.openstreetmap.josm.data.osm.RelationMember;
 import org.openstreetmap.josm.data.osm.Way;
+import org.openstreetmap.josm.gui.layer.Layer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -111,6 +112,59 @@ public final class JosmUtils {
 	}
 
 	/** Ray-casting point-in-polygon test on lat/lon; the ring may or may not be closed. */
+	/**
+	 * Finds a layer by exact name, or by a unique case-insensitive substring of it.
+	 *
+	 * @param layers the layers to search, normally the layer manager's list
+	 * @param wanted exact name or unique substring
+	 * @return the matching layer, never null
+	 * @throws Exception when nothing matches or the substring is ambiguous
+	 */
+	public static Layer findLayer(List<Layer> layers, String wanted) throws Exception {
+		for (Layer l : layers) {
+			if (l.getName().equals(wanted)) {
+				return l;
+			}
+		}
+		List<Layer> matches = new ArrayList<>();
+		String needle = wanted.toLowerCase(Locale.ROOT);
+		for (Layer l : layers) {
+			if (l.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+				matches.add(l);
+			}
+		}
+		if (matches.size() == 1) {
+			return matches.get(0);
+		}
+		if (matches.isEmpty()) {
+			throw new Exception("no layer matches '" + wanted + "'");
+		}
+		StringBuilder names = new StringBuilder();
+		for (Layer l : matches) {
+			if (names.length() > 0) {
+				names.append(", ");
+			}
+			names.append('\'').append(l.getName()).append('\'');
+		}
+		throw new Exception("layer name '" + wanted + "' is ambiguous, " + matches.size() + " layers match: " + names);
+	}
+
+	/** Describes a layer for a tool result: name, type, visibility, opacity and its index in the stack. */
+	public static List<Map<String, Object>> describeLayers(List<Layer> layers) {
+		List<Map<String, Object>> out = new ArrayList<>();
+		for (int i = 0; i < layers.size(); i++) {
+			Layer l = layers.get(i);
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("index", i);
+			m.put("name", l.getName());
+			m.put("type", l.getClass().getSimpleName());
+			m.put("visible", l.isVisible());
+			m.put("opacity", l.getOpacity());
+			out.add(m);
+		}
+		return out;
+	}
+
 	public static boolean pointInPolygon(double lat, double lon, List<LatLon> ring) {
 		boolean inside = false;
 		int n = ring.size();

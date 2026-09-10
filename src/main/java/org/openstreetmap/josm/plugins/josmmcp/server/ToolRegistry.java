@@ -44,6 +44,7 @@ import org.openstreetmap.josm.plugins.josmmcp.tools.DeleteWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.GetUserSelection;
 import org.openstreetmap.josm.plugins.josmmcp.tools.InsertNodeInWay;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ModifyTags;
+import org.openstreetmap.josm.plugins.josmmcp.tools.MoveLayer;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ModifyTagsBatch;
 import org.openstreetmap.josm.plugins.josmmcp.tools.OpenFile;
 import org.openstreetmap.josm.plugins.josmmcp.tools.ReadNode;
@@ -80,6 +81,7 @@ public final class ToolRegistry {
 		t.add(new SelectElements());
 		t.add(new CaptureMapView());
 		t.add(new SetLayerVisibility());
+		t.add(new MoveLayer());
 		t.add(new ValidateTool());
 		t.add(new ReadElements());
 		t.add(new ReadHistory());
