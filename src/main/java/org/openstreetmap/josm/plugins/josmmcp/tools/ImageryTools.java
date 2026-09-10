@@ -149,6 +149,9 @@ public class ImageryTools extends BaseTool {
 		m.put("type", i.getImageryType() == null ? null : i.getImageryType().getTypeString());
 		m.put("id", i.getId());
 		m.put("country", i.getCountryCode());
+		// An entry without declared bounds matches every 'covering' filter because its coverage is
+		// unknown, not because it is known to be worldwide; say which it is.
+		m.put("has_bounds", i.getBounds() != null);
 		m.put("own_entry", own);
 		return m;
 	}
