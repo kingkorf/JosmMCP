@@ -73,8 +73,10 @@ public class SearchTool extends BaseTool {
 		searchProps.put("radius_m", Map.of("type", "number", "description", "Search radius in metres around 'center'"));
 		searchProps.put("fields", Map.of("type", "array", "items", Map.of("type", "string"),
 				"description", "Only include these fields per element, e.g. [\"id\",\"type\",\"tags\"]; omit node_ids/members to keep results small"));
-		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, Arrays.asList("query"),
-				null, null, null);
+		searchProps.put("ids", Map.of("type", "array", "items", Map.of("type", "integer"), "maxItems", 5000,
+				"description", "Only these element ids (any type); with ids the query is optional and bbox/polygon/center "
+						+ "still filter, so 'which of these ids lie in this area' is one call"));
+		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, null, null, null, null);
 		return searchSchema;
 	}
 
@@ -98,7 +100,17 @@ public class SearchTool extends BaseTool {
 
 	@Override
 	public String handle(Map<String, Object> args) throws Exception {
-		String query = requireArg(args, "query").toString();
+		List<Long> ids = new ArrayList<>();
+		if (args.get("ids") instanceof List) {
+			for (Object o : (List<?>) args.get("ids")) {
+				ids.add(toLong(o, "ids"));
+			}
+		}
+		Object queryObj = args.get("query");
+		if (queryObj == null && ids.isEmpty()) {
+			throw new Exception("missing required argument 'query' (or give ids)");
+		}
+		String query = queryObj == null ? "*" : queryObj.toString();
 		int maxResults = getInt(args, "max_results", 50);
 		if (maxResults < 0) {
 			throw new Exception("max_results must not be negative");
@@ -124,10 +136,21 @@ public class SearchTool extends BaseTool {
 			fields.add("type");
 		}
 
-		SearchCompiler.Match matcher = SearchCompiler.compile(query);
+		SearchCompiler.Match matcher = queryObj == null ? null : SearchCompiler.compile(query);
 		Collection<OsmPrimitive> candidates;
 		Object bboxObj = args.get("bbox");
-		if (bboxObj != null) {
+		if (!ids.isEmpty()) {
+			List<OsmPrimitive> c = new ArrayList<>();
+			for (long id : ids) {
+				for (org.openstreetmap.josm.data.osm.OsmPrimitiveType t : org.openstreetmap.josm.data.osm.OsmPrimitiveType.dataValues()) {
+					OsmPrimitive p = ds.getPrimitiveById(new org.openstreetmap.josm.data.osm.SimplePrimitiveId(id, t));
+					if (p != null) {
+						c.add(p);
+					}
+				}
+			}
+			candidates = c;
+		} else if (bboxObj != null) {
 			if (!(bboxObj instanceof List) || ((List<?>) bboxObj).size() != 4) {
 				throw new Exception("bbox must be [min_lon, min_lat, max_lon, max_lat]");
 			}
@@ -188,9 +211,17 @@ public class SearchTool extends BaseTool {
 				candidates = c;
 			}
 		}
+		BBox idBox = null;
+		if (!ids.isEmpty() && bboxObj instanceof List && ((List<?>) bboxObj).size() == 4) {
+			List<?> b = (List<?>) bboxObj;
+			idBox = new BBox(toDouble(b.get(0), "bbox"), toDouble(b.get(1), "bbox"), toDouble(b.get(2), "bbox"), toDouble(b.get(3), "bbox"));
+		}
 		List<OsmPrimitive> results = new ArrayList<>();
 		for (OsmPrimitive prim : candidates) {
-			if (prim.isDeleted() || prim.isIncomplete() || !matcher.match(prim)) {
+			if (prim.isDeleted() || prim.isIncomplete() || (matcher != null && !matcher.match(prim))) {
+				continue;
+			}
+			if (idBox != null && !idBox.intersects(prim.getBBox())) {
 				continue;
 			}
 			if (ring != null && !JosmUtils.insidePolygon(prim, ring)) {
@@ -233,6 +264,11 @@ public class SearchTool extends BaseTool {
 
 	@Override
 	public boolean returnsJson() {
+		return true;
+	}
+
+	@Override
+	protected boolean supportsOutputPath() {
 		return true;
 	}
 }
