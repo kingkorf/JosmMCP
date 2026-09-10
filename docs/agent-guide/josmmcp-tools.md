@@ -72,6 +72,10 @@ Keeps the way's id, tags and history. The subtleties:
 - `reverse_way`: **refuses ways whose tags depend on direction** (`oneway`, `incline`,
   `:left`/`:right`, `:forward`/`:backward`) rather than producing wrong data.
   `skip_irreversible` reverses the rest and reports the refused ones with their tags.
+- `find_duplicate_nodes` returns each parent way **with its tags**, because whether a
+  group should be merged depends on what the ways are. `mergeable` means only that
+  merging raises no tag or relation conflict — a river touching an administrative
+  boundary is `mergeable` and must not be merged.
 - `merge_nodes`: groups with conflicting values for the same key, or with several
   relation members, are refused outright unless `skip_conflicts: true`. `keep_first`
   chooses the survivor; otherwise JOSM prefers an existing node over a new one. Find
@@ -105,7 +109,9 @@ nodes are shared**, e.g. deleting a duplicate way that sits on a coastline.
 `list_imagery` matches an entry's **name and its id**, and takes a `country` filter.
 Worldwide entries have no country code, so that filter excludes them; the result reports
 how many the query still matched as `worldwide_also_matching`, which is absent when no
-filter was given.
+filter was given. **`covering` is the better filter**: pass `[lon, lat]` or a bbox and
+only entries whose declared coverage includes it are returned, with boundless (worldwide)
+entries always matching. Use it wherever a country publishes imagery per region.
 Names are translated into JOSM's interface language, ids are not, so an id fragment
 (`DE-NRW`, `PDOK`) or a generic term (`DOP`, `ortho`) is the reliable search;
 `add_imagery_layer` accepts an exact id as well as a name.

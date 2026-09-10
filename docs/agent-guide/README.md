@@ -105,11 +105,16 @@ The list from `get_josm_state` / `set_layer_visibility` is **top-to-bottom order
   generic term (`DOP`, `ortho`, `ALKIS`) or use the `country` filter. `get_josm_state`
   reports the `locale`, so you know in advance what to expect. The layer tools accept
   that same id, so you can keep using `DE-NRW-DOP` rather than the translated name.
-- **A thin `country` result does not mean there is nothing good.** Worldwide entries
-  (Esri, Bing) carry no country code, so the filter hides them — and in a country whose
-  own catalogue is mostly regional they are often the best aerial available. The result
-  reports how many the filter hid as `worldwide_also_matching`; when that number is not
-  zero, search again without the filter.
+- **Search on the provider's abbreviation, not on a generic word.** `PDOK`, `DE-NRW`,
+  `SPW`, `ALKIS`, `CTR` have found the right layer every time; `ortho` has not. Wallonia's
+  aerials are called "SPW(allonie) … luchtfoto's" and contain neither "ortho" nor
+  "Wallonie" in a form a plain search finds.
+- **`country` is too coarse wherever a country publishes imagery per region.** Filtering
+  Belgium returns 28 Flemish layers for an area in Wallonia. Use `covering` with a
+  `[lon, lat]` or a bbox instead: it keeps only the entries whose declared coverage
+  includes the place, and entries without bounds (worldwide sources such as Esri) always
+  match. `country` additionally hides those worldwide entries, and reports how many as
+  `worldwide_also_matching` — when that is not zero, look at them too.
 - **Remove several layers in one call.** `remove_layer` takes `layers` as a list; that is
   one confirmation dialog instead of one per layer, and it is all-or-nothing.
 - **Order matters**: index 0 is the top, drawn over everything below it. A layer under
@@ -286,6 +291,12 @@ through: PT_Assistant's stop-position and route-gap checks arrived as `test_clas
 - `replace_geometry` and `reshape_area` have real failure modes (dropped shared nodes,
   gluing). Read `josmmcp-tools.md` before using them; `reshape_area` has a
   `dry_run`, always use it first.
+- **Never merge coincident nodes without reading their parent ways' tags.** Two landuse
+  parcels meeting at a corner want a shared node; a river and an administrative boundary
+  that touch do not — gluing those ties a legal line to a physical feature, so it moves
+  whenever someone retraces the water. `find_duplicate_nodes` reports each parent way
+  with its tags for exactly this decision, and `mergeable` only means merging would
+  raise no tag or relation conflict. It is not a recommendation.
 - `delete_elements` with `delete_way_nodes: false` when the nodes are shared.
 - Afterwards: `validate` with `scope: "changes"`, then `pending_changes_summary` so the
   mapper knows exactly what is queued and can write a changeset comment.
