@@ -94,7 +94,7 @@ Each batch is a single undo step and is applied completely or not at all.
 * `download_area` – download a bbox from the OSM server into the active or a new layer (API limit of 0.25 square degrees enforced)
 * `download_incomplete` – complete relations or incomplete stubs
 * `download_overpass` – run an Overpass QL query through JOSM's downloader, e.g. to fetch objects outside the loaded area
-* `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue. Catalogue names are translated into JOSM's interface language, ids are not, so both are searched and `list_imagery` also takes a `country` filter: "NRW" finds "Noordrijn-Westfalen luchtfoto's" through its id `DE-NRW-DOP`
+* `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue. Catalogue names are translated into JOSM's interface language, ids are not, so both are searched and `list_imagery` also takes a `country` filter: "NRW" finds "Noordrijn-Westfalen luchtfoto's" through its id `DE-NRW-DOP`. Worldwide entries carry no country code and are excluded by that filter, so the result counts how many the query still matched as `worldwide_also_matching`
 * `remove_layer` – remove one layer (`layer`) or several (`layers`) as a single confirmation, all or nothing; data layers with unsaved changes are refused unless forced, the active data layer never
 
 **History and files**

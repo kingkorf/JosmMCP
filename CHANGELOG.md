@@ -2,6 +2,11 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-09-11
+
+### Added
+- `list_imagery`: when a `country` filter is given, the result reports `worldwide_also_matching` - how many entries the query matched that the filter hid because they carry no country code. Worldwide sources such as Esri are often the best aerial for a country whose own catalogue is thin and regional, and filtering by country made them silently invisible.
+
 ## [0.7.0] - 2026-09-10
 
 ### Added
