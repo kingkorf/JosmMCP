@@ -21,6 +21,7 @@ REWRITES = [
     ("josmmcp-tools.md", "docs/agent-guide/josmmcp-tools.md"),
     ("osm-wiki.md", "docs/agent-guide/osm-wiki.md"),
     ("dutch-sources.md", "docs/agent-guide/dutch-sources.md"),
+    ("german-sources.md", "docs/agent-guide/german-sources.md"),
     ("../../README.md", "README.md"),
 ]
 

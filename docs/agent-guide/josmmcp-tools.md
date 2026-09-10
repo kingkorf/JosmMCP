@@ -27,6 +27,10 @@ independently of global read-only mode.
 - `tests` filters by substring of the test name; `max_findings` caps the list but the
   per-message summary always covers everything.
 - `include_other: true` adds informational findings — only when you intend to act.
+- Every finding carries `test` and `message` (**translated** into JOSM's interface
+  language) plus `test_class` and `code` (**not** translated). Match on the latter two.
+  All MapCSS tag checks share `test_class` `MapCSSTagChecker`, so for those, read the
+  flagged element's tags instead of parsing the message.
 - `fix: true` applies automatic fixes, each as its own undo step. Findings that call
   themselves fixable but only offer the fix through a dialog come back as
   `fix_unavailable` rather than being silently skipped.
@@ -92,10 +96,16 @@ Removes objects from referencing ways and relations, like JOSM's Delete.
 `delete_way_nodes: false` keeps untagged nodes of a deleted way — **use it whenever the
 nodes are shared**, e.g. deleting a duplicate way that sits on a coastline.
 
-## Layers
+## Layers and the imagery catalogue
 
 `get_josm_state`, `set_layer_visibility` and `move_layer` all report the stack with an
 `index` per layer. **Index 0 is the top**, drawn over everything below it.
+`get_josm_state` also reports the interface `locale`.
+
+`list_imagery` matches an entry's **name and its id**, and takes a `country` filter.
+Names are translated into JOSM's interface language, ids are not, so an id fragment
+(`DE-NRW`, `PDOK`) or a generic term (`DOP`, `ortho`) is the reliable search;
+`add_imagery_layer` accepts an exact id as well as a name.
 
 - `set_layer_visibility` shows, hides or sets the opacity of one layer.
 - `move_layer` reorders. Give **exactly one** of `position` (absolute, out-of-range

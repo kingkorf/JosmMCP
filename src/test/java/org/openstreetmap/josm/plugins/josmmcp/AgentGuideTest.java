@@ -44,6 +44,7 @@ class AgentGuideTest {
 			{"josmmcp-tools.md", "docs/agent-guide/josmmcp-tools.md"},
 			{"osm-wiki.md", "docs/agent-guide/osm-wiki.md"},
 			{"dutch-sources.md", "docs/agent-guide/dutch-sources.md"},
+			{"german-sources.md", "docs/agent-guide/german-sources.md"},
 			{"../../README.md", "README.md"},
 	};
 
@@ -75,7 +76,7 @@ class AgentGuideTest {
 	@Test
 	void everyCompanionFileTheGuideNamesExists() throws IOException {
 		String guide = read(GUIDE);
-		for (String name : List.of("josmmcp-tools.md", "osm-wiki.md", "dutch-sources.md")) {
+		for (String name : List.of("josmmcp-tools.md", "osm-wiki.md", "dutch-sources.md", "german-sources.md")) {
 			assertTrue(guide.contains(name), "the guide should point at " + name);
 			assertTrue(Files.isRegularFile(GUIDE.resolveSibling(name)), name + " is missing");
 		}

@@ -14,8 +14,9 @@ starts mapping.
 - Companion files, read on demand rather than up front:
   [`josmmcp-tools.md`](josmmcp-tools.md) (per-tool behaviour and pitfalls),
   [`osm-wiki.md`](osm-wiki.md) (lookup order and the good-practice principles),
-  [`dutch-sources.md`](dutch-sources.md) — a worked example of section 8 for one
-  country's registers; write the equivalent for yours.
+  [`dutch-sources.md`](dutch-sources.md) and [`german-sources.md`](german-sources.md) —
+  worked examples of section 8 for two countries' registers; write the equivalent for
+  yours.
 
 Nothing here is client-specific: every instruction is about the JosmMCP tools and about
 OpenStreetMap itself.
@@ -25,8 +26,8 @@ stack and some calls pop a modal dialog on their screen. **There is no upload to
 uploading is not yours to do** — finish the edits, report what is pending, let them upload.
 
 Per-tool parameters and gotchas: `josmmcp-tools.md`.
-A worked regional example (Dutch registers, thresholds, imagery coverage):
-`dutch-sources.md`.
+Worked regional examples (registers, thresholds, imagery coverage): `dutch-sources.md`
+and `german-sources.md`.
 
 ## 1. Orient before you touch anything
 
@@ -97,6 +98,12 @@ The list from `get_josm_state` / `set_layer_visibility` is **top-to-bottom order
   wrong kind of source — look at what else is available (`list_imagery`) and add that,
   saying why. Then hide what you are not using, so you are not reading a render with
   layers piled on top of each other.
+- **The catalogue is translated into JOSM's interface language, ids are not.** Searching
+  `list_imagery` for a layer under the name it has in its own country can return nothing
+  while the layer is sitting there: on a Dutch JOSM the North Rhine-Westphalia aerial is
+  "Noordrijn-Westfalen luchtfoto's". Search an id fragment (`DE-NRW`, `PDOK`), a
+  generic term (`DOP`, `ortho`, `ALKIS`) or use the `country` filter. `get_josm_state`
+  reports the `locale`, so you know in advance what to expect.
 - **Order matters**: index 0 is the top, drawn over everything below it. A layer under
   an opaque one is invisible — that is a stacking problem, not an empty layer. Fix it
   with `move_layer` (`above`/`below` another layer by name, `direction`
@@ -200,8 +207,10 @@ Run `validate`, but never report its output raw. Sort into:
 
 - **Real defects** — fix or report.
 - **Known noise** — recurring findings with a structural cause. State the cause once
-  instead of listing them. Two examples, both common wherever islands and water are
-  mapped in detail:
+  instead of listing them. Three that keep coming back:
+  - *"Unknown value for key X"* — **JOSM's presets lag behind the wiki.** `support=roof`
+    and `playground=maze` are both documented, both flagged. Look the value up before
+    you touch it; tidying these away destroys correct data.
   - *"Multipolygon contains a member that is not a way"* — grouping relations such as
     an archipelago legitimately take other relations as members.
   - *"Water area inside water area"* — JOSM's MapCSS test does not subtract inner
@@ -210,6 +219,17 @@ Run `validate`, but never report its output raw. Sort into:
 - **Claims you have not checked.** Never call a finding a false positive on a hunch.
   Prove it — read the relation roles, point-in-polygon every flagged feature against the
   ring — and give the numbers.
+
+**The validator is not the definition of "wrong", in either direction.** On one
+playground it flagged the valid `playground=maze` and said nothing about
+`playground=climbin_slope` next to it — a plain typo. So scan the actual tag values
+yourself on anything you are reviewing, and check unfamiliar ones against the wiki;
+findings the validator does not raise are still findings.
+
+Match findings on `test_class` and `code`, never on `message` or `test`: those two are
+translated into JOSM's interface language and will not match in another locale. All
+MapCSS-based tag checks share `test_class` `MapCSSTagChecker`, so fall back to reading
+the tags of the flagged element rather than parsing its message.
 
 Scope `changes` also pulls in parent ways of moved nodes. Use `tests` to narrow,
 `max_findings` to cap (the summary still covers all), `output_path` when it is long.
