@@ -29,8 +29,12 @@ import java.util.Set;
 
 import org.openstreetmap.josm.data.osm.BBox;
 import org.openstreetmap.josm.data.osm.DataSet;
+import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
+import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.osm.search.SearchCompiler;
+import org.openstreetmap.josm.data.osm.search.SearchMode;
+import org.openstreetmap.josm.data.osm.search.SearchSetting;
 import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.plugins.josmmcp.utils.JosmUtils;
 
@@ -56,7 +60,9 @@ public class SearchTool extends BaseTool {
 		Map<String, Object> searchProps = new HashMap<>();
 		Map<String, Object> queryProp = new HashMap<>();
 		queryProp.put("type", "string");
-		queryProp.put("description", "JOSM search expression, e.g. 'highway=residential' or 'amenity=restaurant name:pizza'");
+		queryProp.put("description", "JOSM search expression, e.g. 'highway=residential' or 'amenity=restaurant name:pizza'. "
+				+ "key=value is an exact, case sensitive match and knows no wildcard: 'source:date=2014' does not "
+				+ "match '2014-03-24'. Use regex=true with a regular expression for that");
 		searchProps.put("query", queryProp);
 		Map<String, Object> maxResultsProp = new HashMap<>();
 		maxResultsProp.put("type", "integer");
@@ -73,6 +79,20 @@ public class SearchTool extends BaseTool {
 		searchProps.put("radius_m", Map.of("type", "number", "description", "Search radius in metres around 'center'"));
 		searchProps.put("fields", Map.of("type", "array", "items", Map.of("type", "string"),
 				"description", "Only include these fields per element, e.g. [\"id\",\"type\",\"tags\"]; omit node_ids/members to keep results small"));
+		searchProps.put("regex", Map.of("type", "boolean",
+				"description", "Read the values in 'query' as regular expressions that must match the whole value, "
+						+ "so '\"source:date\"=2014.*' finds every 2014 date and 'name=B.*blom' every such name "
+						+ "(default false). Round brackets cannot be used: JOSM's query tokenizer splits on them, "
+						+ "so write character classes instead of alternations"));
+		searchProps.put("case_sensitive", Map.of("type", "boolean",
+				"description", "Only has an effect together with regex: a regular expression ignores case unless "
+						+ "this is true (default false). Without regex, key=value is always an exact, case "
+						+ "sensitive match"));
+		searchProps.put("include_geometry", Map.of("type", "boolean",
+				"description", "Add nodes: [{id, lat, lon}] to every way in the result, so way outlines can be "
+						+ "measured without reading the elements separately; nodes already carry lat/lon. Relations "
+						+ "are not expanded, use read_relation with include_geometry for those. Costs about 40 bytes "
+						+ "per node, so combine it with fields and max_results, or write it to output_path"));
 		searchProps.put("ids", Map.of("type", "array", "items", Map.of("type", "integer"), "maxItems", 5000,
 				"description", "Only these element ids (any type); with ids the query is optional and bbox/polygon/center "
 						+ "still filter, so 'which of these ids lie in this area' is one call"));
@@ -135,8 +155,27 @@ public class SearchTool extends BaseTool {
 			fields.add("id");
 			fields.add("type");
 		}
+		boolean includeGeometry = Boolean.TRUE.equals(args.get("include_geometry"));
+		if (includeGeometry && fields != null) {
+			// the geometry was asked for explicitly; do not let 'fields' drop it again
+			fields.add("nodes");
+		}
 
-		SearchCompiler.Match matcher = queryObj == null ? null : SearchCompiler.compile(query);
+		SearchCompiler.Match matcher = null;
+		if (queryObj != null) {
+			boolean regex = Boolean.TRUE.equals(args.get("regex"));
+			boolean caseSensitive = Boolean.TRUE.equals(args.get("case_sensitive"));
+			if (regex || caseSensitive) {
+				SearchSetting setting = new SearchSetting();
+				setting.text = query;
+				setting.mode = SearchMode.replace;
+				setting.regexSearch = regex;
+				setting.caseSensitive = caseSensitive;
+				matcher = SearchCompiler.compile(setting);
+			} else {
+				matcher = SearchCompiler.compile(query);
+			}
+		}
 		Collection<OsmPrimitive> candidates;
 		Object bboxObj = args.get("bbox");
 		if (!ids.isEmpty()) {
@@ -235,7 +274,21 @@ public class SearchTool extends BaseTool {
 
 		List<Map<String, Object>> elements = new ArrayList<>();
 		for (int i = offset, limit = Math.min(results.size(), offset + maxResults); i < limit; i++) {
-			Map<String, Object> m = JosmUtils.toMap(results.get(i));
+			OsmPrimitive prim = results.get(i);
+			Map<String, Object> m = JosmUtils.toMap(prim);
+			if (includeGeometry && prim instanceof Way) {
+				List<Map<String, Object>> geometry = new ArrayList<>();
+				for (Node n : ((Way) prim).getNodes()) {
+					Map<String, Object> nm = new LinkedHashMap<>();
+					nm.put("id", n.getUniqueId());
+					if (n.getCoor() != null) {
+						nm.put("lat", n.getCoor().lat());
+						nm.put("lon", n.getCoor().lon());
+					}
+					geometry.add(nm);
+				}
+				m.put("nodes", geometry);
+			}
 			if (fields != null) {
 				m.keySet().retainAll(fields);
 			}
