@@ -170,10 +170,18 @@ Direct entry points, in this order:
 | Anything else | `https://wiki.openstreetmap.org/w/index.php?search=<terms>` |
 | Is it actually in use? | `https://taginfo.openstreetmap.org/api/4/tag/stats?key=K&value=V` |
 
-Use taginfo **after** the wiki, as a reality check: a scheme the wiki documents but
-nobody uses, or a value with a few hundred uses worldwide and no wiki page, is a
-mistake rather than a convention (`natural=proposed`, 105 uses — the documented form is
-the lifecycle prefix `proposed:natural=water`).
+Use taginfo **after** the wiki, and only as a count — it tells you a tag exists, never
+that it is right here. It misleads in both directions:
+
+- **Low usage exposes a mistake.** A value with a few hundred uses worldwide and no wiki
+  page is an error, not a convention (`natural=proposed`, 105 uses — the documented form
+  is the lifecycle prefix `proposed:natural=water`).
+- **High usage proves nothing.** `landuse=static_caravan` has 32 445 uses, enough to wave
+  through. Only the wiki says what it is *for*: plot outlines carrying addresses from the
+  Dutch BAG import, explicitly **not** a building outline. That is what turned 204
+  seemingly wrong objects into 204 correct ones sitting beside 360 correct
+  `building=static_caravan` outlines of a different kind. A count could never have told
+  you that.
 
 Country pages matter too: national import rules and tagging conventions live under
 `https://wiki.openstreetmap.org/wiki/<Country>` and its `/Import` and `/Tagging`
