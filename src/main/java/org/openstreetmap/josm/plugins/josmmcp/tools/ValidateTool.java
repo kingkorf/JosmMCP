@@ -65,10 +65,26 @@ public class ValidateTool extends BaseTool {
 		Map<String, Object> props = new HashMap<>();
 		Map<String, Object> scope = new HashMap<>();
 		scope.put("type", "string");
-		scope.put("enum", new ArrayList<>(Arrays.asList("changes", "selection", "all")));
+		scope.put("enum", new ArrayList<>(Arrays.asList("changes", "selection", "all", "bbox", "elements")));
 		scope.put("description", "What to validate: 'changes' = modified or new elements (default), "
-				+ "'selection' = the user's current selection, 'all' = every element in the layer");
+				+ "'selection' = the user's current selection, 'all' = every element in the layer, 'bbox' = everything "
+				+ "intersecting the given bbox (implied when bbox is given), 'elements' = the given elements plus, for "
+				+ "nodes, their parent ways (implied when elements is given)");
 		props.put("scope", scope);
+		props.put("bbox", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 4, "maxItems", 4,
+				"description", "[min_lon, min_lat, max_lon, max_lat]: validate everything intersecting this box"));
+		Map<String, Object> el = new HashMap<>();
+		el.put("type", "object");
+		el.put("properties", Map.of("type", Map.of("type", "string", "enum", Arrays.asList("node", "way", "relation")),
+				"id", Map.of("type", "integer")));
+		el.put("required", Arrays.asList("type", "id"));
+		props.put("elements", Map.of("type", "array", "items", el, "minItems", 1, "maxItems", 5000,
+				"description", "Validate exactly these elements (nodes bring their parent ways along)"));
+		props.put("tests", Map.of("type", "array", "items", Map.of("type", "string"),
+				"description", "Only run validator tests whose name contains one of these strings (case-insensitive), "
+						+ "e.g. [\"Crossing\", \"Duplicate\"]; default all enabled tests"));
+		props.put("max_findings", Map.of("type", "integer",
+				"description", "Return at most this many findings (default 500); the per-message summary always covers all"));
 		Map<String, Object> other = new HashMap<>();
 		other.put("type", "boolean");
 		other.put("description", "Also include informational findings of severity 'other' (default false)");
@@ -91,7 +107,16 @@ public class ValidateTool extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 		Object scopeObj = args == null ? null : args.get("scope");
-		String scope = scopeObj == null ? "changes" : scopeObj.toString();
+		Object bboxObj = args == null ? null : args.get("bbox");
+		Object elementsObj = args == null ? null : args.get("elements");
+		String scope = scopeObj != null ? scopeObj.toString() : bboxObj != null ? "bbox" : elementsObj != null ? "elements" : "changes";
+		int maxFindings = getInt(args, "max_findings", 500);
+		List<String> testFilter = new ArrayList<>();
+		if (args != null && args.get("tests") instanceof List) {
+			for (Object t : (List<?>) args.get("tests")) {
+				testFilter.add(String.valueOf(t).toLowerCase(java.util.Locale.ROOT));
+			}
+		}
 		boolean includeOther = args != null && Boolean.TRUE.equals(args.get("include_other"));
 		boolean beforeUpload = args != null && Boolean.TRUE.equals(args.get("before_upload"));
 		boolean fix = args != null && Boolean.TRUE.equals(args.get("fix"));
@@ -126,8 +151,65 @@ public class ValidateTool extends BaseTool {
 			targets.addAll(ds.allNonDeletedPrimitives());
 			partial = false;
 			break;
+		case "bbox": {
+			if (!(bboxObj instanceof List) || ((List<?>) bboxObj).size() != 4) {
+				throw new Exception("scope bbox needs bbox [min_lon, min_lat, max_lon, max_lat]");
+			}
+			List<?> b = (List<?>) bboxObj;
+			org.openstreetmap.josm.data.osm.BBox box = new org.openstreetmap.josm.data.osm.BBox(toDouble(b.get(0), "bbox"),
+					toDouble(b.get(1), "bbox"), toDouble(b.get(2), "bbox"), toDouble(b.get(3), "bbox"));
+			if (!box.isValid()) {
+				throw new Exception("bbox is not valid");
+			}
+			java.util.LinkedHashSet<OsmPrimitive> set = new java.util.LinkedHashSet<>();
+			for (OsmPrimitive p : ds.searchNodes(box)) {
+				if (!p.isDeleted()) {
+					set.add(p);
+				}
+			}
+			for (OsmPrimitive p : ds.searchWays(box)) {
+				if (!p.isDeleted() && !p.isIncomplete()) {
+					set.add(p);
+				}
+			}
+			for (OsmPrimitive p : ds.searchRelations(box)) {
+				if (!p.isDeleted() && !p.isIncomplete()) {
+					set.add(p);
+				}
+			}
+			targets = set;
+			break;
+		}
+		case "elements": {
+			if (!(elementsObj instanceof List) || ((List<?>) elementsObj).isEmpty()) {
+				throw new Exception("scope elements needs a non-empty elements array of {type, id}");
+			}
+			java.util.LinkedHashSet<OsmPrimitive> set = new java.util.LinkedHashSet<>();
+			for (Object o : (List<?>) elementsObj) {
+				if (!(o instanceof Map)) {
+					throw new Exception("each element must be an object with type and id");
+				}
+				Map<?, ?> m = (Map<?, ?>) o;
+				long id = toLong(m.get("id"), "id");
+				OsmPrimitive p = ds.getPrimitiveById(new org.openstreetmap.josm.data.osm.SimplePrimitiveId(id,
+						org.openstreetmap.josm.data.osm.OsmPrimitiveType.from(String.valueOf(m.get("type")))));
+				if (p == null || p.isDeleted() || p.isIncomplete()) {
+					throw new Exception(m.get("type") + " " + id + " not found");
+				}
+				set.add(p);
+				if (p instanceof org.openstreetmap.josm.data.osm.Node) {
+					for (OsmPrimitive parent : p.getReferrers()) {
+						if (!parent.isDeleted() && !parent.isIncomplete()) {
+							set.add(parent);
+						}
+					}
+				}
+			}
+			targets = set;
+			break;
+		}
 		default:
-			throw new Exception("scope must be changes, selection or all");
+			throw new Exception("scope must be changes, selection, all, bbox or elements");
 		}
 
 		Map<String, Object> result = new LinkedHashMap<>();
@@ -143,6 +225,20 @@ public class ValidateTool extends BaseTool {
 
 		OsmValidator.initializeTests();
 		Collection<Test> tests = OsmValidator.getEnabledTests(beforeUpload);
+		if (!testFilter.isEmpty()) {
+			List<Test> kept = new ArrayList<>();
+			for (Test t : tests) {
+				String name = (t.getName() + " " + t.getClass().getSimpleName()).toLowerCase(java.util.Locale.ROOT);
+				for (String f : testFilter) {
+					if (name.contains(f)) {
+						kept.add(t);
+						break;
+					}
+				}
+			}
+			tests = kept;
+			result.put("tests_filter", testFilter);
+		}
 		List<TestError> errors = new ArrayList<>();
 		List<String> failedTests = new ArrayList<>();
 		for (Test test : tests) {
@@ -228,6 +324,10 @@ public class ValidateTool extends BaseTool {
 		result.put("other", nOther);
 		result.put("ignored", nIgnored);
 		result.put("summary", byMessage);
+		if (findings.size() > maxFindings) {
+			result.put("findings_omitted", findings.size() - maxFindings);
+			findings = new ArrayList<>(findings.subList(0, maxFindings));
+		}
 		result.put("findings", findings);
 		if (!failedTests.isEmpty()) {
 			result.put("failed_tests", failedTests);
@@ -237,6 +337,11 @@ public class ValidateTool extends BaseTool {
 
 	@Override
 	public boolean returnsJson() {
+		return true;
+	}
+
+	@Override
+	protected boolean supportsOutputPath() {
 		return true;
 	}
 }
