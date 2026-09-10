@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.openstreetmap.josm.command.MoveCommand;
+import org.openstreetmap.josm.command.ChangeCommand;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
@@ -83,7 +83,11 @@ public class UpdateNode extends BaseTool {
 			throw new Exception("invalid coordinates: " + ll);
 		}
 
-		MoveCommand c = new MoveCommand(nd, ll);
+		// ChangeCommand with a copy keeps the exact lat/lon; MoveCommand would go through the
+		// projection and leave floating point noise in the coordinates.
+		Node moved = new Node(nd);
+		moved.setCoor(ll);
+		ChangeCommand c = new ChangeCommand(nd, moved);
 		addCommand(c, tr("Move node {0}", nd.getUniqueId()));
 
 		return "Node " + id + " moved to " + ll;
