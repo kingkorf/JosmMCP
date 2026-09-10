@@ -107,6 +107,14 @@ Names are translated into JOSM's interface language, ids are not, so an id fragm
 (`DE-NRW`, `PDOK`) or a generic term (`DOP`, `ortho`) is the reliable search;
 `add_imagery_layer` accepts an exact id as well as a name.
 
+A layer created from the catalogue is **named after the translated name**, but
+`set_layer_visibility`, `move_layer` and `remove_layer` also resolve the catalogue id,
+and the layer lists report it as `imagery_id`. So `DE-NRW-DOP` works end to end.
+
+`remove_layer` takes `layers` as a list: one confirmation dialog for the lot, and
+all-or-nothing — if one of them is the active data layer or has unsaved changes, nothing
+is removed.
+
 - `set_layer_visibility` shows, hides or sets the opacity of one layer.
 - `move_layer` reorders. Give **exactly one** of `position` (absolute, out-of-range
   values clamp), `direction` (`up`, `down`, `top`, `bottom`), `above` or `below`

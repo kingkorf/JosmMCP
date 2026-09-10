@@ -103,7 +103,10 @@ The list from `get_josm_state` / `set_layer_visibility` is **top-to-bottom order
   while the layer is sitting there: on a Dutch JOSM the North Rhine-Westphalia aerial is
   "Noordrijn-Westfalen luchtfoto's". Search an id fragment (`DE-NRW`, `PDOK`), a
   generic term (`DOP`, `ortho`, `ALKIS`) or use the `country` filter. `get_josm_state`
-  reports the `locale`, so you know in advance what to expect.
+  reports the `locale`, so you know in advance what to expect. The layer tools accept
+  that same id, so you can keep using `DE-NRW-DOP` rather than the translated name.
+- **Remove several layers in one call.** `remove_layer` takes `layers` as a list; that is
+  one confirmation dialog instead of one per layer, and it is all-or-nothing.
 - **Order matters**: index 0 is the top, drawn over everything below it. A layer under
   an opaque one is invisible — that is a stacking problem, not an empty layer. Fix it
   with `move_layer` (`above`/`below` another layer by name, `direction`
@@ -123,7 +126,9 @@ The list from `get_josm_state` / `set_layer_visibility` is **top-to-bottom order
 - `wait_ms` 5000–8000 for WMS/WMTS; the default 1500 is too short for aerials.
 - **Past roughly 0.1 m/px a WMTS may upsample a coarser tile and place it wrongly.** An
   apparent ~10 m offset at extreme zoom is usually this, not bad imagery. Re-capture
-  wider before concluding anything is misaligned.
+  wider before concluding anything is misaligned. Others simply stop: BDOrtho IGN draws
+  a "no tiles at this zoom level" tile instead of imagery, which is easy to mistake for
+  an area with no coverage.
 - Anchor conclusions to vector geometry — a register's rings, an overlay's outlines,
   OSM's own nodes — not to pixels.
 - `select_elements` before capturing makes the objects under discussion visible in the
@@ -200,6 +205,19 @@ Full list in `osm-wiki.md`. The ones that decide real cases here:
 Go to the register. When a decision depends on external state: fetch it, index it by a
 stable id, and cross-check with a second independent method. **Two methods agreeing on
 the same number is what makes a bulk edit defensible.**
+
+**Never count a register's feature type before you know what is in it.** The type name
+is not a definition. NRW's ALKIS `GebaeudeBauwerk` returns 4319 objects for one town but
+only 3661 are `gebnutzbez=Gebäude`; the rest are canopies and building parts. Dividing by
+the raw number turns 98.7% coverage into a fabricated 16% gap. So before quoting any
+ratio, pull the register's own classification (`propertyName=` keeps that query cheap by
+dropping the geometry) and say which classes you counted. France's BD TOPO `batiment`
+turned out to be a clean building layer — but that was checked, not assumed.
+
+**Publish only values you have seen.** Do not infer an identifier, a field name or an
+enum value from a class hierarchy, a naming pattern or a guessed URL: print it once and
+read it. The same goes for endpoints — probing three plausible WFS URLs to find the one
+that answers is cheaper than documenting the wrong one.
 
 ## 9. Validator triage
 

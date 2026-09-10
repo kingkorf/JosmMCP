@@ -79,3 +79,34 @@ Other useful references: TopoTijdreis (historic), Rijkswaterstaat Kustlidar (ele
 - Coastline on the Wadden islands changes fast; carry `check_date` and compare against
   the newest ortho before redrawing. Several islands carry a `note` warning that Bing is
   too old to trace from.
+
+---
+
+# Appendix: France (IGN BD TOPO)
+
+Same method, third country. The national building layer is served from the IGN geoplatform:
+
+```bash
+curl -sS -G 'https://data.geopf.fr/wfs/ows' \
+  --data-urlencode 'service=WFS' --data-urlencode 'version=2.0.0' \
+  --data-urlencode 'request=GetFeature' \
+  --data-urlencode 'typeNames=BDTOPO_V3:batiment' \
+  --data-urlencode 'srsName=urn:ogc:def:crs:EPSG::4326' \
+  --data-urlencode 'bbox=<minlat>,<minlon>,<maxlat>,<maxlon>,urn:ogc:def:crs:EPSG::4326' \
+  --data-urlencode 'resultType=hits'
+```
+
+Swap `resultType=hits` for `count=2000` plus `propertyName=nature,usage_1,etat_de_l_objet`
+to classify without downloading geometry. Unlike ALKIS, `batiment` is a clean building
+layer: over Pontrieux all 1462 features were buildings, 1461 `etat_de_l_objet=En service`
+and one `En ruine`. `usage_1` distinguishes `Résidentiel`, `Annexe`, `Commercial et
+services`; `nature` is mostly `Indifférenciée`.
+
+Watch the age of what is already in OSM: French towns were bulk-imported from the
+cadastre years ago, and the buildings carry it in `source`, e.g.
+`cadastre-dgi-fr source : Direction Générale des Impôts - Cadastre. Mise à jour : 2011`.
+In Pontrieux 88% of 1427 buildings came from the 2011 lichting and still matched the
+current BDOrtho — old is not the same as wrong, so measure before re-importing.
+
+Imagery and overlays in the JOSM catalogue: `fr.ign.bdortho` (BDOrtho IGN, the standard
+aerial) and `Cadastre` (parcels). Both are found with `country: "FR"`.
