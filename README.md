@@ -57,14 +57,18 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 * `select_elements` – select objects in JOSM (optionally zoom to them) so the mapper sees them
 * `capture_map_view` – render the map view (data plus imagery) to an image, optionally zooming to an element or bbox first and restoring the view afterwards
 * `set_layer_visibility` – show/hide a layer or set its opacity
+* `search_elements` – JOSM search expressions with `bbox`, `polygon`, `center`+`radius_m`, `ids`, `fields`, `offset`/`max_results`. `key=value` is an exact, case sensitive match without wildcards, so `regex=true` reads the values as regular expressions that must match the whole value (`"source:date"=2014.*`); `case_sensitive` then decides whether that regex ignores case. `include_geometry` adds `nodes: [{id, lat, lon}]` to every way in the result, so outlines can be compared with an external source without reading each way separately
 * `find_orphan_nodes` – untagged nodes used by no way or relation (by default only new or modified ones), ready for `delete_elements`
 * `find_duplicate_nodes` – groups of nodes at the same position (or within `tolerance_m`) in a bbox or the whole layer, with tags, parent ways and whether merging would conflict
-* `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection, the whole layer, a `bbox` or a list of `elements`; `tests` restricts to tests whose name contains a string, `max_findings` caps the list (the summary always covers all); `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes
+* `validate` – run JOSM's validator over the pending changes (including parent ways of moved nodes), the selection, the whole layer, a `bbox` or a list of `elements`; `tests` restricts to tests whose name contains a string, `max_findings` caps the list (the summary always covers all); `before_upload` mirrors JOSM's upload check; `fix` applies automatic fixes and reports as `fix_unavailable` the findings that call themselves fixable but only offer their fix through a dialog
 
 **Nodes, ways, relations**
 
 * `create_node`, `read_node`, `update_node` (move), `delete_node`
 * `create_way`, `read_way` (with `include_nodes`), `update_way_nodes`, `replace_geometry`, `delete_way`
+* `insert_node_in_way` – put an existing node into a way's node list at the segment it lies on, for an entrance on a building outline or the end of a connecting way on a road; refuses a node farther than `max_distance_m` (default 1 m) and with `snap_m` first moves it onto its projection so the outline keeps its shape
+* `split_way` – split a way at nodes of its own, like JOSM's Split Way; the part chosen by `keep` (`longest` or `first`) keeps the id, tags and history, the rest become new ways and parent relations are updated. Warnings JOSM would show in a dialog come back in the result
+* `reverse_way` – reverse the node order of one or more ways in one undo step. Ways whose tags depend on the direction (`oneway`, `incline`, `:left`/`:right`, ...) are refused, since reversing them without swapping those tags makes the data wrong; `skip_irreversible` reverses the rest and reports them
 * `create_relation`, `read_relation` (with `include_geometry`), `update_relation_members`, `delete_relation`
 * `reshape_area` – redraw a landuse-like area so that given buildings lie outside (`exclude`) or inside (`include`) it, with `offset_m` of room; the ground moves to or from the neighbouring areas so the tiling stays gap- and overlap-free, other buildings and areas are protected, `dry_run` previews
 

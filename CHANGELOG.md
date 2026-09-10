@@ -2,6 +2,19 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-09-10
+
+### Added
+- `split_way`: split a way at nodes of its own, like JOSM's Split Way. The part chosen by `keep` (`longest` by default, or `first`) keeps the way's id, tags and history, the other parts become new ways with the same tags, and parent relations are updated. The warnings JOSM would raise in a dialog (uncertain relation member order, incomplete relations) are collected and returned, together with the parent relations and whether they have incomplete members.
+- `reverse_way`: reverse the node order of one or more ways as a single undo step. Tags are left alone, so a way whose tags depend on its direction (`oneway`, `incline`, the `:left`/`:right` and `:forward`/`:backward` suffixes) is refused instead of being turned into wrong data; `skip_irreversible` reverses the others and reports the refused ones with their tags.
+- `search_elements`: `include_geometry` adds `nodes: [{id, lat, lon}]` to every way in the result, so way outlines can be compared with an external source without reading each way separately; it survives a `fields` filter. Relations are not expanded (use `read_relation`), nodes already carried their coordinates.
+- `search_elements`: `regex` reads the values in the query as regular expressions that must match the whole value (`"source:date"=2014.*`), and `case_sensitive` decides whether such a regex ignores case. Without `regex`, `key=value` stays JOSM's exact, case sensitive match, which has no wildcard - the query is now documented that way, because `source:date=2014` silently matching nothing on a value of `2014-03-24` reads like a bug.
+- `insert_node_in_way`: put an existing node into a way's node list at the segment it lies on, without resending the whole list - for an `entrance` on a building outline, a gate on a road or the end of a connecting way at a T-junction. Refuses a node farther than `max_distance_m` (default 1 m) from the way and reports the measured distance; `snap_m` first moves a node that close onto its projection on the way, so the way's shape does not change. `index` inserts at an exact position instead.
+
+### Fixed
+- `update_relation_members` reported the new member count as the old one ("now has 28 members (was 28)"), because it read the count after the change command had already been applied.
+- `validate` with `fix=true` silently skipped findings whose test reports `fixable` but returns no command because it only offers the fix through a dialog (PT_Assistant does this); the result showed `fixed: 0` without explanation. Those are now counted as `fix_unavailable` with a note.
+
 ## [0.4.0] - 2026-09-10
 
 ### Added
