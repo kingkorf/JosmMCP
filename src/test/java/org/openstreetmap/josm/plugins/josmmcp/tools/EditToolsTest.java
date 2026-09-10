@@ -1182,4 +1182,34 @@ class EditToolsTest {
 		assertTrue(group.path("mergeable").asBoolean(), "no tag conflict, which is not the same as correct");
 	}
 
+
+	@Test
+	void searchCanCountValuesInsteadOfReturningElements() throws Exception {
+		for (String v : Arrays.asList("house", "house", "house", "garage", "yes")) {
+			Way w = square();
+			new ModifyTags().handle(args("element_type", "way", "element_id", w.getUniqueId(),
+					"tags", Map.of("building", v)));
+		}
+		// one more way that matches the query but has no building tag
+		Way plain = square();
+		new ModifyTags().handle(args("element_type", "way", "element_id", plain.getUniqueId(),
+				"tags", Map.of("landuse", "meadow")));
+
+		JsonNode r = JSON.readTree(new SearchTool().handle(
+				args("query", "type:way", "group_by", "building", "max_results", 1)));
+		assertEquals("building", r.path("group_by").asText());
+		assertEquals(6, r.path("total_matches").asInt());
+		// max_results does not cap the counting
+		assertEquals(3, r.path("distinct_values").asInt());
+		assertEquals(1, r.path("without_key").asInt());
+		// commonest first
+		assertEquals("house", r.path("groups").get(0).path("value").asText());
+		assertEquals(3, r.path("groups").get(0).path("count").asInt());
+		// the elements themselves stay out of the result
+		assertFalse(r.has("elements"));
+
+		// without group_by the tool behaves as before
+		assertTrue(JSON.readTree(new SearchTool().handle(args("query", "type:way"))).has("elements"));
+	}
+
 }

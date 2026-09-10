@@ -69,6 +69,11 @@ public class SearchTool extends BaseTool {
 		maxResultsProp.put("description", "Maximum number of elements to return (default 50)");
 		searchProps.put("max_results", maxResultsProp);
 		searchProps.put("offset", Map.of("type", "integer", "description", "Skip this many matches first, for paging (default 0)"));
+		searchProps.put("group_by", Map.of("type", "string", "description",
+				"Instead of the elements, return how often each value of this tag key occurs among all matches, "
+						+ "commonest first, plus how many matches lack the key. Answers 'what kinds of thing are here' "
+						+ "(group_by 'building' over a town) without the elements passing through the conversation. "
+						+ "Counts every match, so max_results and offset do not apply"));
 		searchProps.put("bbox", Map.of("type", "array", "items", Map.of("type", "number"), "minItems", 4, "maxItems", 4,
 				"description", "Only elements intersecting [min_lon, min_lat, max_lon, max_lat]"));
 		searchProps.put("polygon", Map.of("type", "array", "minItems", 3,
@@ -141,6 +146,11 @@ public class SearchTool extends BaseTool {
 			throw new Exception("no active dataset found");
 		}
 
+		Object gb = args == null ? null : args.get("group_by");
+		String groupBy = gb == null ? null : gb.toString().trim();
+		if (groupBy != null && groupBy.isEmpty()) {
+			throw new Exception("group_by must be a tag key");
+		}
 		int offset = getInt(args, "offset", 0);
 		if (offset < 0) {
 			throw new Exception("offset must not be negative");
@@ -308,6 +318,35 @@ public class SearchTool extends BaseTool {
 			result.put("radius_m", radius);
 		}
 		result.put("total_matches", results.size());
+		if (groupBy != null) {
+			// Counting replaces the element list: the point is to keep the elements out of the result.
+			Map<String, Integer> counts = new java.util.HashMap<>();
+			int without = 0;
+			for (OsmPrimitive p : results) {
+				String v = p.get(groupBy);
+				if (v == null) {
+					without++;
+				} else {
+					counts.merge(v, 1, Integer::sum);
+				}
+			}
+			List<Map<String, Object>> groups = new ArrayList<>();
+			counts.entrySet().stream()
+					.sorted((a, b) -> b.getValue().equals(a.getValue())
+							? a.getKey().compareTo(b.getKey())
+							: b.getValue() - a.getValue())
+					.forEach(e -> {
+						Map<String, Object> g = new LinkedHashMap<>();
+						g.put("value", e.getKey());
+						g.put("count", e.getValue());
+						groups.add(g);
+					});
+			result.put("group_by", groupBy);
+			result.put("distinct_values", groups.size());
+			result.put("without_key", without);
+			result.put("groups", groups);
+			return JosmUtils.toJson(result);
+		}
 		result.put("offset", offset);
 		result.put("returned", elements.size());
 		result.put("truncated", offset + elements.size() < results.size());
