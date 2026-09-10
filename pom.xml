@@ -4,7 +4,7 @@
 
   <groupId>org.openstreetmap.josm.plugins</groupId>
   <artifactId>josmmcp</artifactId>
-  <version>0.7.1</version>
+  <version>0.8.0</version>
   <packaging>jar</packaging>
 
   <name>josmmcp</name>

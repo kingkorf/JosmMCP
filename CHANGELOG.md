@@ -2,6 +2,15 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-09-11
+
+### Added
+- `list_imagery`: a `covering` filter taking `[lon, lat]` or a bbox, keeping only the entries whose declared coverage includes it; entries without bounds are worldwide and always match. `country` is too coarse wherever a country publishes imagery per region - filtering Belgium for a place in Wallonia returned 28 Flemish layers and none of the Walloon ones.
+- `find_duplicate_nodes`: each parent way is now reported with its tags. Whether a group should be merged depends on what the ways are - two landuse parcels meeting at a corner want a shared node, a river and an administrative boundary that touch do not - and that could not be judged from the bare way ids the tool used to return.
+
+### Changed
+- `find_duplicate_nodes` documents that `mergeable` means merging would raise no tag or relation conflict, not that merging is correct.
+
 ## [0.7.1] - 2026-09-11
 
 ### Added
