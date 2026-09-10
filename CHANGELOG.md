@@ -2,6 +2,18 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-09-10
+
+### Added
+- `remove_layer`: a `layers` list removes several layers under one confirmation dialog, all-or-nothing - everything is resolved and checked before the first removal, so naming the active data layer or one with unsaved changes leaves the whole stack untouched.
+- `set_layer_visibility`, `move_layer` and `remove_layer` resolve a layer by the catalogue id it was created from as well as by its name, and the layer lists report that id as `imagery_id`. A layer is named after its *translated* catalogue name, so `add_imagery_layer` accepting an id was only half the story: `DE-NRW-DOP` now works end to end.
+
+### Fixed
+- The MapCSS validator test class was documented as `MapCSSTagChecker`; it is `MapCSSTagCheckerAndRule` with code 3000.
+
+### Notes
+- Exposing the matched MapCSS rule per finding was investigated and dropped. `TestError.getIgnoreGroup()` and `getIgnoreSubGroup()` embed the translated message, and the `rule` field of the tester does not correspond to the finding (a check for `building=construction` reported a tester holding a `barrier=kerb` rule), so there is no reliable per-finding handle for MapCSS checks beyond class and code. Read the flagged element's tags instead.
+
 ## [0.6.1] - 2026-09-10
 
 ### Fixed

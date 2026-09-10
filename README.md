@@ -56,7 +56,7 @@ Read tools return JSON, also as MCP structured content with an output schema. Ev
 * `pending_changes_summary` – counts, tag keys, bbox and undo history of the pending changes, for drafting a changeset comment
 * `select_elements` – select objects in JOSM (optionally zoom to them) so the mapper sees them
 * `capture_map_view` – render the map view (data plus imagery) to an image, optionally zooming to an element or bbox first and restoring the view afterwards
-* `set_layer_visibility` – show/hide a layer or set its opacity
+* `set_layer_visibility` – show/hide a layer or set its opacity. Layer tools resolve a layer by name or by the catalogue id it came from (`DE-NRW-DOP`), and report that id as `imagery_id`
 * `move_layer` – move a layer up or down the stack (`position`, `direction`, `above` or `below`), so an overlay can be put above the imagery that was covering it; index 0 is the top
 * `search_elements` – JOSM search expressions with `bbox`, `polygon`, `center`+`radius_m`, `ids`, `fields`, `offset`/`max_results`. `key=value` is an exact, case sensitive match without wildcards, so `regex=true` reads the values as regular expressions that must match the whole value (`"source:date"=2014.*`); `case_sensitive` then decides whether that regex ignores case. `include_geometry` adds `nodes: [{id, lat, lon}]` to every way in the result, so outlines can be compared with an external source without reading each way separately
 * `find_orphan_nodes` – untagged nodes used by no way or relation (by default only new or modified ones), ready for `delete_elements`
@@ -95,7 +95,7 @@ Each batch is a single undo step and is applied completely or not at all.
 * `download_incomplete` – complete relations or incomplete stubs
 * `download_overpass` – run an Overpass QL query through JOSM's downloader, e.g. to fetch objects outside the loaded area
 * `list_imagery`, `add_imagery_layer` – find and add aerial imagery or WMS/WMTS layers from JOSM's catalogue. Catalogue names are translated into JOSM's interface language, ids are not, so both are searched and `list_imagery` also takes a `country` filter: "NRW" finds "Noordrijn-Westfalen luchtfoto's" through its id `DE-NRW-DOP`
-* `remove_layer` – remove a layer; data layers with unsaved changes are refused unless forced, the active data layer never
+* `remove_layer` – remove one layer (`layer`) or several (`layers`) as a single confirmation, all or nothing; data layers with unsaved changes are refused unless forced, the active data layer never
 
 **History and files**
 
