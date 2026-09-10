@@ -119,8 +119,10 @@ public class UpdateRelation extends BaseTool {
 		}
 		Relation updated = new Relation(rel);
 		updated.setMembers(members);
+		// Read the old count before the command is applied; afterwards rel already holds the new members.
+		int before = rel.getMembersCount();
 		addCommand(new ChangeCommand(rel, updated), tr("Update members of relation {0}", rel.getUniqueId()));
-		return "Relation " + id + " now has " + members.size() + " members (was " + rel.getMembersCount() + ")";
+		return "Relation " + id + " now has " + members.size() + " members (was " + before + ")";
 	}
 
 
