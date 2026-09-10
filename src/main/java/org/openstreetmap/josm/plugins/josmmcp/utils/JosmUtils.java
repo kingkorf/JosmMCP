@@ -29,6 +29,8 @@ import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.Relation;
 import org.openstreetmap.josm.data.osm.RelationMember;
 import org.openstreetmap.josm.data.osm.Way;
+import org.openstreetmap.josm.data.imagery.ImageryInfo;
+import org.openstreetmap.josm.gui.layer.ImageryLayer;
 import org.openstreetmap.josm.gui.layer.Layer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -120,16 +122,31 @@ public final class JosmUtils {
 	 * @return the matching layer, never null
 	 * @throws Exception when nothing matches or the substring is ambiguous
 	 */
+	/**
+	 * The catalogue id an imagery layer was created from, or null for other layers. A layer is
+	 * named after its translated catalogue name, so the id is the only handle that survives a
+	 * change of JOSM's interface language.
+	 */
+	public static String imageryId(Layer layer) {
+		if (layer instanceof ImageryLayer) {
+			ImageryInfo info = ((ImageryLayer) layer).getInfo();
+			return info == null ? null : info.getId();
+		}
+		return null;
+	}
+
 	public static Layer findLayer(List<Layer> layers, String wanted) throws Exception {
 		for (Layer l : layers) {
-			if (l.getName().equals(wanted)) {
+			if (l.getName().equals(wanted) || wanted.equals(imageryId(l))) {
 				return l;
 			}
 		}
 		List<Layer> matches = new ArrayList<>();
 		String needle = wanted.toLowerCase(Locale.ROOT);
 		for (Layer l : layers) {
-			if (l.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+			String id = imageryId(l);
+			if (l.getName().toLowerCase(Locale.ROOT).contains(needle)
+					|| (id != null && id.toLowerCase(Locale.ROOT).contains(needle))) {
 				matches.add(l);
 			}
 		}
@@ -158,6 +175,10 @@ public final class JosmUtils {
 			m.put("index", i);
 			m.put("name", l.getName());
 			m.put("type", l.getClass().getSimpleName());
+			String id = imageryId(l);
+			if (id != null) {
+				m.put("imagery_id", id);
+			}
 			m.put("visible", l.isVisible());
 			m.put("opacity", l.getOpacity());
 			out.add(m);
