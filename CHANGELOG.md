@@ -2,6 +2,13 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-09-11
+
+### Added
+- `search_elements`: `group_by` returns how often each value of a tag key occurs among all matches, commonest first, plus `without_key`, and leaves the elements out of the result entirely. `max_results` and `offset` do not apply to the counting. This replaces the dump-to-file-and-script round trip that a tag census needed.
+- `list_imagery`: entries report `has_bounds`, so an entry that matches `covering` because its coverage is unknown can be told from one that is known to cover the area.
+- `docs/agent-guide/`: a closing section recording the order an area analysis actually follows, so that the register cross-check does not get skipped.
+
 ## [0.8.0] - 2026-09-11
 
 ### Added
