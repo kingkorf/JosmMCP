@@ -653,4 +653,242 @@ class EditToolsTest {
 		JsonNode nodeScope = JSON.readTree(new ValidateTool().handle(args("elements", Arrays.asList(Map.of("type", "node", "id", w.getNode(0).getUniqueId())))));
 		assertTrue(nodeScope.path("validated_elements").asInt() >= 2, "a node brings its parent way");
 	}
+
+	/** Open way of five nodes running east, tagged so the parts can be told apart. */
+	private Way openLine(String key, String value, int count) throws Exception {
+		List<Long> ids = new ArrayList<>();
+		for (int i = 0; i < count; i++) {
+			ids.add(node(5.0 + i * 0.0002, 52.0));
+		}
+		long wid = Long.parseLong(new CreateWay().handle(args("node_ids", ids)));
+		new ModifyTags().handle(args("element_type", "way", "element_id", wid, "tags", Map.of(key, value)));
+		return (Way) ds.getPrimitiveById(new SimplePrimitiveId(wid, OsmPrimitiveType.WAY));
+	}
+
+	@Test
+	void splitWayKeepsIdOnOnePartAndCopiesTags() throws Exception {
+		Way w = openLine("waterway", "ditch", 5);
+		long original = w.getUniqueId();
+		Node at = w.getNode(2);
+		int before = UndoRedoHandler.getInstance().getUndoCommands().size();
+
+		JsonNode r = JSON.readTree(new SplitWay().handle(args("id", original, "at_node_ids",
+				Arrays.asList(at.getUniqueId()))));
+		assertEquals(2, r.path("parts").asInt(), r.toString());
+		assertEquals(original, r.path("kept_way").path("id").asLong());
+		assertEquals(1, r.path("new_ways").size());
+		assertEquals(before + 1, UndoRedoHandler.getInstance().getUndoCommands().size(), "one undo step");
+
+		long other = r.path("new_ways").get(0).path("id").asLong();
+		Way part = (Way) ds.getPrimitiveById(new SimplePrimitiveId(other, OsmPrimitiveType.WAY));
+		assertNotNull(part);
+		assertEquals("ditch", part.get("waterway"), "the new part carries the tags of the original");
+		assertEquals(3, w.getNodesCount());
+		assertEquals(3, part.getNodesCount());
+		assertTrue(w.containsNode(at) && part.containsNode(at), "both parts share the split node");
+	}
+
+	@Test
+	void splitWayAtTwoNodesGivesThreeParts() throws Exception {
+		Way w = openLine("highway", "path", 6);
+		JsonNode r = JSON.readTree(new SplitWay().handle(args("id", w.getUniqueId(), "at_node_ids",
+				Arrays.asList(w.getNode(2).getUniqueId(), w.getNode(4).getUniqueId()), "keep", "first")));
+		assertEquals(3, r.path("parts").asInt(), r.toString());
+		assertEquals(2, r.path("new_ways").size());
+		// with keep=first the kept way is the first chunk: nodes 0..2
+		assertEquals(3, r.path("kept_way").path("nodes").asInt(), r.toString());
+	}
+
+	@Test
+	void splitWayRefusesEndNodesAndForeignNodes() throws Exception {
+		Way w = openLine("waterway", "drain", 4);
+		long loose = node(6.0, 53.0);
+		assertTrue(assertThrows(Exception.class, () -> new SplitWay().handle(args("id", w.getUniqueId(),
+				"at_node_ids", Arrays.asList(w.getNode(0).getUniqueId())))).getMessage().contains("end node"));
+		assertTrue(assertThrows(Exception.class, () -> new SplitWay().handle(args("id", w.getUniqueId(),
+				"at_node_ids", Arrays.asList(loose)))).getMessage().contains("not a node of way"));
+		Way ring = square();
+		assertTrue(assertThrows(Exception.class, () -> new SplitWay().handle(args("id", ring.getUniqueId(),
+				"at_node_ids", Arrays.asList(ring.getNode(1).getUniqueId())))).getMessage().contains("at least two"));
+	}
+
+	@Test
+	void reverseWayFlipsNodeOrderInOneStep() throws Exception {
+		Way w = openLine("waterway", "drain", 4);
+		List<Node> before = new ArrayList<>(w.getNodes());
+		int commands = UndoRedoHandler.getInstance().getUndoCommands().size();
+
+		JsonNode r = JSON.readTree(new ReverseWay().handle(args("ids", Arrays.asList(w.getUniqueId()))));
+		assertEquals(1, r.path("reversed_count").asInt(), r.toString());
+		assertEquals(commands + 1, UndoRedoHandler.getInstance().getUndoCommands().size());
+		for (int i = 0; i < before.size(); i++) {
+			assertEquals(before.get(i), w.getNode(before.size() - 1 - i), "node order must be mirrored");
+		}
+		assertEquals("drain", w.get("waterway"), "tags are untouched");
+	}
+
+	@Test
+	void reverseWayRefusesDirectionDependentTags() throws Exception {
+		Way plain = openLine("waterway", "ditch", 3);
+		Way oneway = openLine("highway", "residential", 3);
+		new ModifyTags().handle(args("element_type", "way", "element_id", oneway.getUniqueId(),
+				"tags", Map.of("oneway", "yes")));
+		List<Node> plainBefore = new ArrayList<>(plain.getNodes());
+
+		// all-or-nothing by default: neither way is touched
+		assertTrue(assertThrows(Exception.class, () -> new ReverseWay().handle(args("ids",
+				Arrays.asList(plain.getUniqueId(), oneway.getUniqueId())))).getMessage().contains("depend on the direction"));
+		assertEquals(plainBefore, plain.getNodes(), "nothing may change when the call is refused");
+
+		JsonNode r = JSON.readTree(new ReverseWay().handle(args("ids",
+				Arrays.asList(plain.getUniqueId(), oneway.getUniqueId()), "skip_irreversible", true)));
+		assertEquals(1, r.path("reversed_count").asInt(), r.toString());
+		assertEquals(1, r.path("skipped_count").asInt(), r.toString());
+		assertEquals(oneway.getUniqueId(), r.path("skipped").get(0).path("id").asLong());
+		assertEquals("yes", oneway.get("oneway"));
+	}
+
+	@Test
+	void insertNodeInWayPicksTheNearestSegment() throws Exception {
+		Way w = square();
+		int nodesBefore = w.getNodesCount();
+		// about 0.35 m north of the southern edge, halfway along it
+		long entrance = node(5.0005, 52.0000031);
+		new ModifyTags().handle(args("element_type", "node", "element_id", entrance, "tags", Map.of("entrance", "main")));
+
+		JsonNode r = JSON.readTree(new InsertNodeInWay().handle(args("way_id", w.getUniqueId(), "node_id", entrance)));
+		assertEquals(1, r.path("index").asInt(), r.toString());
+		assertTrue(r.path("distance_m").asDouble() < 1.0, r.toString());
+		assertTrue(r.path("node_is_tagged").asBoolean());
+		assertFalse(r.path("snapped").asBoolean());
+		assertEquals(nodesBefore + 1, w.getNodesCount());
+		Node n = (Node) ds.getPrimitiveById(new SimplePrimitiveId(entrance, OsmPrimitiveType.NODE));
+		assertEquals(n, w.getNode(1));
+		assertTrue(w.isClosed(), "a ring stays closed");
+	}
+
+	@Test
+	void insertNodeInWayRefusesFarNodesAndCanSnap() throws Exception {
+		Way w = square();
+		long far = node(5.0005, 52.0002);
+		Exception e = assertThrows(Exception.class,
+				() -> new InsertNodeInWay().handle(args("way_id", w.getUniqueId(), "node_id", far)));
+		assertTrue(e.getMessage().contains("max_distance_m"), e.getMessage());
+		assertFalse(w.containsNode((Node) ds.getPrimitiveById(new SimplePrimitiveId(far, OsmPrimitiveType.NODE))));
+
+		long near = node(5.0007, 52.0000031);
+		JsonNode r = JSON.readTree(new InsertNodeInWay().handle(args("way_id", w.getUniqueId(), "node_id", near,
+				"snap_m", 1.0)));
+		assertTrue(r.path("snapped").asBoolean(), r.toString());
+		Node n = (Node) ds.getPrimitiveById(new SimplePrimitiveId(near, OsmPrimitiveType.NODE));
+		assertEquals(52.0, n.lat(), 1e-9, "snapped onto the southern edge");
+		assertTrue(w.containsNode(n));
+	}
+
+	@Test
+	void insertNodeInWayRejectsANodeItAlreadyHas() throws Exception {
+		Way w = square();
+		Exception e = assertThrows(Exception.class, () -> new InsertNodeInWay().handle(
+				args("way_id", w.getUniqueId(), "node_id", w.getNode(1).getUniqueId())));
+		assertTrue(e.getMessage().contains("already a node of way"), e.getMessage());
+	}
+
+	@Test
+	void updateRelationMembersReportsThePreviousCount() throws Exception {
+		Way w = square();
+		long extra = node(5.002, 52.002);
+		String rid = new CreateRelation().handle(args("tags", Map.of("type", "multipolygon"),
+				"members", Arrays.asList(Map.of("type", "way", "ref", w.getUniqueId(), "role", "outer"))));
+		long relId = Long.parseLong(rid.replaceAll("[^-0-9]", ""));
+		String out = new UpdateRelation().handle(args("id", relId, "members", Arrays.asList(
+				Map.of("type", "way", "ref", w.getUniqueId(), "role", "outer"),
+				Map.of("type", "node", "ref", extra, "role", "label"))));
+		assertTrue(out.contains("now has 2 members (was 1)"), out);
+	}
+
+	@Test
+	void searchWithRegexMatchesPartOfAValue() throws Exception {
+		Way a = square();
+		new ModifyTags().handle(args("element_type", "way", "element_id", a.getUniqueId(),
+				"tags", Map.of("building", "yes", "source:date", "2014-03-24")));
+		Way b = way("building", "house", node(5.01, 52.01), node(5.011, 52.01), node(5.011, 52.011), node(5.01, 52.011));
+		new ModifyTags().handle(args("element_type", "way", "element_id", b.getUniqueId(),
+				"tags", Map.of("source:date", "2025-11-10")));
+
+		// key=value is exact and has no wildcard, so a partial value finds nothing
+		assertEquals(0, JSON.readTree(new SearchTool().handle(args("query", "\"source:date\"=2014")))
+				.path("total_matches").asInt(), "key=value must stay an exact match");
+		assertEquals(0, JSON.readTree(new SearchTool().handle(args("query", "\"source:date\"=2014.*")))
+				.path("total_matches").asInt(), "a regex is only a regex with regex=true");
+
+		JsonNode r = JSON.readTree(new SearchTool().handle(args("query", "\"source:date\"=2014.*", "regex", true)));
+		assertEquals(1, r.path("total_matches").asInt(), r.toString());
+		assertEquals(a.getUniqueId(), r.path("elements").get(0).path("id").asLong());
+
+		JsonNode both = JSON.readTree(new SearchTool().handle(args("query", "\"source:date\"=20[0-9]{2}-.*", "regex", true)));
+		assertEquals(2, both.path("total_matches").asInt(), both.toString());
+		// the regex has to match the whole value
+		assertEquals(0, JSON.readTree(new SearchTool().handle(args("query", "\"source:date\"=03", "regex", true)))
+				.path("total_matches").asInt());
+	}
+
+	@Test
+	void caseSensitiveOnlyAppliesToRegexMatching() throws Exception {
+		Way w = square();
+		new ModifyTags().handle(args("element_type", "way", "element_id", w.getUniqueId(),
+				"tags", Map.of("building", "yes", "name", "Buterblom")));
+
+		// a regex ignores case by default, and case_sensitive turns that off
+		assertEquals(1, JSON.readTree(new SearchTool().handle(args("query", "name=b.*BLOM", "regex", true)))
+				.path("total_matches").asInt());
+		assertEquals(0, JSON.readTree(new SearchTool().handle(args("query", "name=b.*BLOM", "regex", true,
+				"case_sensitive", true))).path("total_matches").asInt());
+		assertEquals(1, JSON.readTree(new SearchTool().handle(args("query", "name=B.*blom", "regex", true,
+				"case_sensitive", true))).path("total_matches").asInt());
+		// without regex the match is exact and case sensitive either way
+		assertEquals(0, JSON.readTree(new SearchTool().handle(args("query", "name=buterblom")))
+				.path("total_matches").asInt());
+		assertEquals(1, JSON.readTree(new SearchTool().handle(args("query", "name=Buterblom")))
+				.path("total_matches").asInt());
+	}
+
+	@Test
+	void searchCanReturnWayGeometry() throws Exception {
+		Way w = square();
+		new ModifyTags().handle(args("element_type", "way", "element_id", w.getUniqueId(), "tags", Map.of("building", "yes")));
+
+		JsonNode plain = JSON.readTree(new SearchTool().handle(args("query", "building=yes")));
+		assertTrue(plain.path("elements").get(0).path("nodes").isMissingNode(), "geometry is opt-in");
+
+		JsonNode r = JSON.readTree(new SearchTool().handle(args("query", "building=yes", "include_geometry", true)));
+		JsonNode nodes = r.path("elements").get(0).path("nodes");
+		assertEquals(w.getNodesCount(), nodes.size(), r.toString());
+		assertEquals(w.getNode(0).getUniqueId(), nodes.get(0).path("id").asLong());
+		assertEquals(52.0, nodes.get(0).path("lat").asDouble(), 1e-9);
+		assertEquals(5.0, nodes.get(0).path("lon").asDouble(), 1e-9);
+
+		// 'fields' must not drop geometry that was asked for explicitly
+		JsonNode narrow = JSON.readTree(new SearchTool().handle(args("query", "building=yes",
+				"include_geometry", true, "fields", Arrays.asList("id"))));
+		JsonNode el = narrow.path("elements").get(0);
+		assertTrue(el.path("tags").isMissingNode(), "fields still narrows the rest");
+		assertEquals(w.getNodesCount(), el.path("nodes").size(), narrow.toString());
+	}
+
+	@Test
+	void searchGeometryLeavesNodesAndRelationsAlone() throws Exception {
+		Way w = square();
+		String rid = new CreateRelation().handle(args("tags", Map.of("type", "multipolygon"),
+				"members", Arrays.asList(Map.of("type", "way", "ref", w.getUniqueId(), "role", "outer"))));
+		assertNotNull(rid);
+		JsonNode r = JSON.readTree(new SearchTool().handle(args("query", "type:node", "include_geometry", true,
+				"max_results", 1)));
+		JsonNode n = r.path("elements").get(0);
+		assertTrue(n.path("nodes").isMissingNode(), "a node needs no node list");
+		Node hit = (Node) ds.getPrimitiveById(new SimplePrimitiveId(n.path("id").asLong(), OsmPrimitiveType.NODE));
+		assertEquals(hit.lat(), n.path("lat").asDouble(), 1e-9, "a node already carries its coordinates");
+		assertEquals(hit.lon(), n.path("lon").asDouble(), 1e-9);
+		JsonNode rel = JSON.readTree(new SearchTool().handle(args("query", "type:relation", "include_geometry", true)));
+		assertTrue(rel.path("elements").get(0).path("nodes").isMissingNode(), "relations are not expanded");
+	}
 }
