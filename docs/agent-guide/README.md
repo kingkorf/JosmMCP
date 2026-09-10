@@ -57,6 +57,9 @@ go wrong. Four habits, in order of impact:
    against an external source. Combine it with `fields` and `output_path`.
 4. **`ids` plus a spatial filter in one call.** "Which of these lie in this area" is a
    single `search_elements`; the query is optional when `ids` is given.
+5. **`group_by` when you want a count, not the objects.** `search_elements` with
+   `group_by: "building"` returns value→count over every match and no elements at all —
+   the whole tag census of a town in ten lines instead of a megabyte through a file.
 
 `read_elements` reads many objects at once — prefer it over repeated `read_node`/`read_way`.
 
@@ -314,3 +317,30 @@ Before anything risky, `save_layer` preserves pending edits across a restart, an
 
 State what you measured and how. Give ids so the mapper can select them. Separate
 "fixed", "found but not touched" and "noise". Say plainly that nothing is uploaded.
+
+## 13. Recipe: analysing an area
+
+The steps below are the order that has held up across a dozen areas. Follow it rather
+than improvising, mainly so that step 5 does not get skipped.
+
+1. **Orient.** `get_josm_state` — bounds, `locale`, `incomplete_stubs`, and what layers
+   already exist. Confirm the area actually covers what the mapper named; check whether
+   anything is clipped at the download edge before you report a gap.
+2. **Layers.** Add an aerial and a reference overlay if they are not there, searching
+   the catalogue by the provider's abbreviation and filtering with `covering`. Put the
+   reference above the aerial and leave it hidden until you need it.
+3. **Validate wide.** `validate` with `scope: "all"` and `output_path`, then group the
+   findings by `test_class` and `code`. Never paste the raw list.
+4. **Census the tags.** `search_elements` with `group_by` on the keys that matter
+   (`building`, `highway`, `landuse`) tells you what kind of place this is and where the
+   detail is thin — how many buildings carry an address, how many tracks a `tracktype`.
+5. **Cross-check against the register**, if the country has one that is queryable.
+   Classify its feature type before dividing (section 8). If there is none, say so and
+   compare the layers visually instead.
+6. **Capture what you are claiming.** Targeted, zoomed in, and A/B solo captures when
+   comparing against a reference.
+7. **Report in three buckets**: real defects with ids, known noise with its cause stated
+   once, and what needs a survey. Say plainly that nothing is uploaded.
+
+Two habits that decide whether the report is worth anything: prove a false positive
+before calling it one, and never quote a ratio whose denominator you have not inspected.

@@ -12,6 +12,9 @@ independently of global read-only mode.
 - **Round brackets cannot be used in a regex** — JOSM's query tokenizer splits on them.
   Write character classes instead of alternations.
 - `fields`, `max_results` (default 50), `offset`, `output_path` control the size.
+- `group_by` replaces the element list with a value→count table for one tag key, over
+  **all** matches — `max_results` and `offset` do not apply to it — plus `without_key`
+  for the matches that lack it. Use it for any "how many of each" question.
 - `include_geometry` adds `nodes: [{id, lat, lon}]` to every way; it survives a `fields`
   filter. Relations are **not** expanded — use `read_relation` with `include_geometry`.
   Costs ~40 bytes per node, so pair it with `output_path`.
