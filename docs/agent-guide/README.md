@@ -268,6 +268,12 @@ Run `validate`, but never report its output raw. Sort into:
   - *"Water area inside water area"* — JOSM's MapCSS test does not subtract inner
     rings, so everything inside a correctly-cut-out island is flagged against the
     water body around it.
+  - *"Overlapping buildings" in a cadastral import* — terraced housing whose party
+    walls the register draws a few centimetres apart. Seen on BAG and on Catastro; in
+    Albarracín all 56 pairs overlapped by under 1 m², the largest by 280 cm². **Two
+    checks settle it**: compute the overlap area, and count how many pairs already
+    share a node — 45 of those 56 did, which is what a shared wall looks like and a
+    duplicate does not. Reshaping these away damages a correct import.
 - **Claims you have not checked.** Never call a finding a false positive on a hunch.
   Prove it — read the relation roles, point-in-polygon every flagged feature against the
   ring — and give the numbers.
