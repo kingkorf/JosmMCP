@@ -2,6 +2,12 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.3] - 2026-09-11
+
+### Changed
+- `search_elements`: giving `ids` raises the default `max_results` to the number of ids. Asking for 70 specific ways returned 50 of them with `truncated: true`, which is a sensible guard for an open query and a trap for an explicit list. An explicit `max_results` still wins.
+- `docs/agent-guide/`: "overlapping buildings" in a cadastral import is recorded as a known noise class, with the two checks that settle it - the overlap area, and how many pairs already share a node.
+
 ## [0.8.2] - 2026-09-11
 
 ### Changed
