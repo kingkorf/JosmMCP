@@ -2,6 +2,11 @@
 
 All notable changes to JosmMCP. The format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.4] - 2026-09-11
+
+### Changed
+- `docs/agent-guide/`: the area-analysis recipe now puts one wide capture at step 3, before validating and counting. The rule to confirm the download covers the right place was already in step 1 but had no action attached to it, and the only call that shows it sat at the end; in Kuinre that meant a validate and two censuses over half a village before the mistake surfaced.
+
 ## [0.8.3] - 2026-09-11
 
 ### Changed
