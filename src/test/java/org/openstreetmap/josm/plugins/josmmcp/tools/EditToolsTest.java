@@ -1212,4 +1212,28 @@ class EditToolsTest {
 		assertTrue(JSON.readTree(new SearchTool().handle(args("query", "type:way"))).has("elements"));
 	}
 
+
+	@Test
+	void anExplicitIdListIsNotCutToTheDefaultPageSize() throws Exception {
+		List<Long> ids = new ArrayList<>();
+		for (int i = 0; i < 60; i++) {
+			ids.add(Long.parseLong(new CreateNode().handle(args("latitude", 52.0 + i * 1e-5, "longitude", 5.0))));
+		}
+		// naming 60 ids returns 60, where the plain default would have stopped at 50
+		JsonNode r = JSON.readTree(new SearchTool().handle(args("ids", ids, "fields", Arrays.asList("id"))));
+		assertEquals(60, r.path("total_matches").asInt());
+		assertEquals(60, r.path("returned").asInt());
+		assertFalse(r.path("truncated").asBoolean());
+
+		// an explicit max_results still wins
+		JsonNode capped = JSON.readTree(new SearchTool().handle(
+				args("ids", ids, "max_results", 10, "fields", Arrays.asList("id"))));
+		assertEquals(10, capped.path("returned").asInt());
+		assertTrue(capped.path("truncated").asBoolean());
+
+		// a query without ids keeps the old default
+		JsonNode plain = JSON.readTree(new SearchTool().handle(args("query", "type:node")));
+		assertEquals(50, plain.path("returned").asInt());
+	}
+
 }

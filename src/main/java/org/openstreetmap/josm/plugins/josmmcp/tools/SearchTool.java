@@ -66,7 +66,7 @@ public class SearchTool extends BaseTool {
 		searchProps.put("query", queryProp);
 		Map<String, Object> maxResultsProp = new HashMap<>();
 		maxResultsProp.put("type", "integer");
-		maxResultsProp.put("description", "Maximum number of elements to return (default 50)");
+		maxResultsProp.put("description", "Maximum number of elements to return (default 50, or the number of 'ids' when that is larger)");
 		searchProps.put("max_results", maxResultsProp);
 		searchProps.put("offset", Map.of("type", "integer", "description", "Skip this many matches first, for paging (default 0)"));
 		searchProps.put("group_by", Map.of("type", "string", "description",
@@ -100,7 +100,8 @@ public class SearchTool extends BaseTool {
 						+ "per node, so combine it with fields and max_results, or write it to output_path"));
 		searchProps.put("ids", Map.of("type", "array", "items", Map.of("type", "integer"), "maxItems", 5000,
 				"description", "Only these element ids (any type); with ids the query is optional and bbox/polygon/center "
-						+ "still filter, so 'which of these ids lie in this area' is one call"));
+						+ "still filter, so 'which of these ids lie in this area' is one call. Giving ids also raises the "
+						+ "default max_results to the number of ids, so an explicit list is not silently cut to 50"));
 		McpSchema.JsonSchema searchSchema = new McpSchema.JsonSchema("object", searchProps, null, null, null, null);
 		return searchSchema;
 	}
@@ -136,7 +137,9 @@ public class SearchTool extends BaseTool {
 			throw new Exception("missing required argument 'query' (or give ids)");
 		}
 		String query = queryObj == null ? "*" : queryObj.toString();
-		int maxResults = getInt(args, "max_results", 50);
+		// With 'ids' the caller has already named exactly what it wants, so the page size defaults to
+		// that count instead of 50: silently dropping half of an explicit list is a trap, not a guard.
+		int maxResults = getInt(args, "max_results", ids.isEmpty() ? 50 : Math.max(50, ids.size()));
 		if (maxResults < 0) {
 			throw new Exception("max_results must not be negative");
 		}
